@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { generateSecureCode, type Vulnerability, type SecureCodeResponse } from '@/app/actions'
-import { IconLoader2, IconAlertTriangle, IconChevronDown, IconChevronUp, IconAlertCircle, IconCode, IconTerminal2 } from '@tabler/icons-react'
+import { IconLoader2, IconAlertTriangle, IconChevronDown, IconChevronUp, IconAlertCircle, IconCode, IconTerminal2, IconCopy, IconCheck } from '@tabler/icons-react'
 
 // Sample response data for development without API calls
 const SAMPLE_RESPONSE: SecureCodeResponse = {
@@ -41,6 +41,7 @@ export default function AegisChatBot() {
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([])
   const [expandedVulnerability, setExpandedVulnerability] = useState<number | null>(null)
   const [useSampleData, setUseSampleData] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
 
   async function onSubmit() {
     try {
@@ -89,6 +90,18 @@ export default function AegisChatBot() {
       setExpandedVulnerability(index)
     }
   }
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(secureCode);
+      setIsCopied(true);
+      setTimeout(() => {
+        setIsCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
 
   return (
     <div className="max-w-4xl w-full mx-auto relative z-10 flex items-center space-x-4 rounded-sm flex-col bg-zinc-950/50 p-10 ring-1 ring-white/10 backdrop-blur-md">
@@ -211,11 +224,27 @@ export default function AegisChatBot() {
             Generated Secure Code:
           </h3>
           <div className="rounded-lg overflow-hidden shadow-lg ring-1 ring-zinc-400/10 dark:ring-zinc-700/30">
-            <div className="flex items-center px-4 py-2 bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-800 border-b border-zinc-300/70 dark:border-zinc-700/80">
+            <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-800 border-b border-zinc-300/70 dark:border-zinc-700/80">
               <div className="flex items-center">
                 <IconCode className="w-4 h-4 mr-2 text-emerald-500 dark:text-emerald-400" />
                 <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Secure Code</span>
               </div>
+              <button 
+                onClick={copyToClipboard}
+                className="flex items-center text-xs px-2 py-1 rounded bg-zinc-200/70 dark:bg-zinc-700/70 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+              >
+                {isCopied ? (
+                  <>
+                    <IconCheck className="w-3.5 h-3.5 mr-1 text-emerald-500" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <IconCopy className="w-3.5 h-3.5 mr-1" />
+                    <span>Copy code</span>
+                  </>
+                )}
+              </button>
             </div>
             <pre className="bg-gradient-to-b from-zinc-50/90 to-white dark:from-slate-900/90 dark:to-slate-950 p-4 overflow-x-auto text-sm text-left text-zinc-800 dark:text-zinc-100 font-mono">
               <code>{secureCode}</code>
