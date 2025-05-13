@@ -1,17 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { generateSecureCode, type Vulnerability, type SecureCodeResponse } from '@/app/actions'
-import { IconLoader2, IconAlertTriangle, IconChevronDown, IconChevronUp, IconAlertCircle, IconCode, IconTerminal2, IconCopy, IconCheck } from '@tabler/icons-react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { generateSecureCode, type Vulnerability, type SecureCodeResponse, type CodeDiff } from '@/app/actions'
+import { IconLoader2, IconAlertTriangle, IconChevronDown, IconChevronUp, IconAlertCircle, IconCode, IconTerminal2, IconCopy, IconCheck, IconShield, IconBug, IconMapPin, IconTools, IconExchange, IconColumns, IconMaximize, IconMinimize, IconX, IconInfoCircle } from '@tabler/icons-react'
 
 // Sample response data for development without API calls
 const SAMPLE_RESPONSE: SecureCodeResponse = {
-  secureCode: `// Secure version of the code
-function processUserInput(input) {
-  // Input is sanitized before use
+  secureCode: `function processUserInput(input) {
   const sanitizedInput = DOMPurify.sanitize(input);
   
-  // Prepared statement used instead of string concatenation
   const query = 'SELECT * FROM users WHERE username = ?';
   const stmt = connection.prepare(query);
   const result = stmt.get(sanitizedInput);
@@ -22,14 +19,74 @@ function processUserInput(input) {
     {
       description: "SQL Injection vulnerability in database query. The original code used string concatenation to build SQL queries which allows attackers to inject malicious SQL commands.",
       severity: "high",
-      location: "Line 5 in function processUserInput()",
+      location: "Line 4 in function processUserInput()",
       solution: "Used prepared statements with parameterized queries instead of concatenating strings."
     },
     {
       description: "Cross-Site Scripting (XSS) vulnerability due to unfiltered user input being processed. User input was not sanitized before use.",
       severity: "medium",
-      location: "Throughout the function where input is used",
+      location: "Line 2 where input is used directly",
       solution: "Added input sanitization using DOMPurify before processing user input."
+    }
+  ],
+  diff: [
+    {
+      lineNumber: 1,
+      originalLine: "function processUserInput(input) {",
+      securedLine: "function processUserInput(input) {",
+      changeType: "unchanged"
+    },
+    {
+      lineNumber: 2,
+      originalLine: "  const query = 'SELECT * FROM users WHERE username = \"' + input + '\"';",
+      securedLine: "  const sanitizedInput = DOMPurify.sanitize(input);",
+      changeType: "modified",
+      explanation: "Added input sanitization to prevent XSS attacks"
+    },
+    {
+      lineNumber: 3,
+      originalLine: "",
+      securedLine: "",
+      changeType: "unchanged"
+    },
+    {
+      lineNumber: 4,
+      originalLine: "  const result = connection.query(query);",
+      securedLine: "  const query = 'SELECT * FROM users WHERE username = ?';",
+      changeType: "modified",
+      explanation: "Changed query to use parameterized statement"
+    },
+    {
+      lineNumber: 5,
+      originalLine: "",
+      securedLine: "  const stmt = connection.prepare(query);",
+      changeType: "added",
+      explanation: "Added query preparation step"
+    },
+    {
+      lineNumber: 6,
+      originalLine: "",
+      securedLine: "  const result = stmt.get(sanitizedInput);",
+      changeType: "added",
+      explanation: "Used prepared statement with parameter binding"
+    },
+    {
+      lineNumber: 7,
+      originalLine: "  return result;",
+      securedLine: "",
+      changeType: "unchanged"
+    },
+    {
+      lineNumber: 8,
+      originalLine: "}",
+      securedLine: "  return result;",
+      changeType: "unchanged"
+    },
+    {
+      lineNumber: 9,
+      originalLine: "",
+      securedLine: "}",
+      changeType: "unchanged"
     }
   ]
 };
@@ -39,9 +96,321 @@ export default function AegisChatBot() {
   const [isLoading, setIsLoading] = useState(false)
   const [secureCode, setSecureCode] = useState<string>('')
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([])
+  const [diff, setDiff] = useState<CodeDiff[]>([])
   const [expandedVulnerability, setExpandedVulnerability] = useState<number | null>(null)
   const [useSampleData, setUseSampleData] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
+  const [showDiffView, setShowDiffView] = useState(false)
+  const [isFullScreen, setIsFullScreen] = useState(false)
+  
+  // Refs for synchronized scrolling
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+  const diffContainerRef = useRef<HTMLDivElement>(null);
+  const fullScreenContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Handle full-screen mode body overflow
+  useLayoutEffect(() => {
+    if (isFullScreen) {
+      // Prevent scrolling on the body when full-screen is active
+      document.body.style.overflow = 'hidden';
+      
+      // Create full-screen container if it doesn't exist
+      if (!fullScreenContainerRef.current) {
+        const container = document.createElement('div');
+        container.id = 'aegis-fullscreen-container';
+        container.style.position = 'fixed';
+        container.style.top = '0';
+        container.style.left = '0';
+        container.style.width = '100vw';
+        container.style.height = '100vh';
+        container.style.zIndex = '10000';
+        container.style.backgroundColor = document.documentElement.classList.contains('dark') 
+          ? '#09090b' // dark mode background
+          : '#ffffff'; // light mode background
+        container.style.overflow = 'hidden';
+        
+        document.body.appendChild(container);
+        fullScreenContainerRef.current = container;
+        
+        // Force render the full-screen content
+        renderFullScreenContent();
+      }
+    } else {
+      // Restore body scrolling when exiting full-screen
+      document.body.style.overflow = '';
+      
+      // Remove full-screen container if it exists
+      if (fullScreenContainerRef.current) {
+        document.body.removeChild(fullScreenContainerRef.current);
+        fullScreenContainerRef.current = null;
+      }
+    }
+    
+    // Cleanup function
+    return () => {
+      document.body.style.overflow = '';
+      if (fullScreenContainerRef.current) {
+        document.body.removeChild(fullScreenContainerRef.current);
+        fullScreenContainerRef.current = null;
+      }
+    };
+  }, [isFullScreen]);
+  
+  // Function to render full-screen content into the container
+  const renderFullScreenContent = () => {
+    if (!fullScreenContainerRef.current || !diff.length) return;
+    
+    const container = fullScreenContainerRef.current;
+    
+    // Add styles for tooltips to the container
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+      .aegis-tooltip {
+        position: absolute;
+        z-index: 50;
+        max-width: 320px;
+        width: max-content;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.375rem;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        font-size: 0.75rem;
+        line-height: 1.25rem;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+        transform: translateY(-100%);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        background-color: rgb(255, 255, 255);
+        color: rgb(17, 24, 39);
+        border: 1px solid rgb(229, 231, 235);
+        white-space: normal;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+        left: 0;
+        text-align: left;
+      }
+      
+      .dark .aegis-tooltip {
+        background-color: rgb(31, 41, 55);
+        color: rgb(229, 231, 235);
+        border-color: rgb(55, 65, 81);
+      }
+      
+      .aegis-tooltip-trigger:hover .aegis-tooltip {
+        opacity: 1;
+      }
+      
+      .aegis-info-icon {
+        display: inline-flex;
+        margin-left: 0.5rem;
+        color: rgb(99, 102, 241); 
+      }
+      
+      @media (prefers-color-scheme: dark) {
+        .aegis-tooltip {
+          background-color: rgb(31, 41, 55);
+          color: rgb(229, 231, 235);
+          border-color: rgb(55, 65, 81);
+        }
+      }
+    `;
+    container.appendChild(styleElement);
+    
+    // Create the content HTML
+    const content = `
+      <div class="w-full h-full flex flex-col bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
+        <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
+          <div class="flex items-center">
+            <svg class="w-5 h-5 mr-2 text-indigo-500" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+              <path d="M3 16v4h18v-4" />
+              <path d="M3 8v4h18v-4" />
+              <path d="M9 4l-2 2l2 2" />
+              <path d="M15 20l2 -2l-2 -2" />
+            </svg>
+            <h3 class="text-lg font-medium text-zinc-800 dark:text-zinc-200">
+              Code Comparison - Full Screen
+            </h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="aegis-fullscreen-copy" class="flex items-center text-xs px-3 py-1.5 rounded bg-zinc-200/70 dark:bg-zinc-700/70 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">
+              <svg class="w-3.5 h-3.5 mr-1.5" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z" />
+                <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
+              </svg>
+              <span>Copy Secure Code</span>
+            </button>
+            <button id="aegis-fullscreen-exit" class="flex items-center px-3 py-1.5 rounded-md text-zinc-700 dark:text-zinc-300 text-xs bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">
+              <svg class="w-3.5 h-3.5 mr-1.5" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M15 19v-2a2 2 0 0 1 2 -2h2" />
+                <path d="M15 5v2a2 2 0 0 0 2 2h2" />
+                <path d="M5 15h2a2 2 0 0 1 2 2v2" />
+                <path d="M5 9h2a2 2 0 0 0 2 -2v-2" />
+              </svg>
+              <span>Exit Full Screen</span>
+            </button>
+          </div>
+        </div>
+        
+        <div class="flex-1 flex overflow-hidden">
+          <div class="flex text-sm font-mono w-full h-full relative">
+            <!-- Line numbers column -->
+            <div class="sticky left-0 z-20 flex-none w-12 bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 overflow-y-auto">
+              ${diff.map((line, index) => `
+                <div class="h-6 text-center text-xs text-zinc-500 dark:text-zinc-500 leading-6">
+                  ${line.lineNumber}
+                </div>
+              `).join('')}
+            </div>
+            
+            <!-- Code panels container -->
+            <div class="flex w-full h-full">
+              <!-- Original code panel (left side) -->
+              <div id="aegis-fullscreen-left" class="w-1/2 overflow-auto border-r border-zinc-200 dark:border-zinc-800" style="scrollbar-width: thin;">
+                ${diff.map((line, index) => {
+                  const styles = getChangeTypeStylesForHTML(line.changeType);
+                  return `
+                    <div class="h-6 ${line.changeType === 'added' ? 'opacity-50' : ''} ${styles.bg} border-b border-zinc-100 dark:border-zinc-900">
+                      <div class="flex whitespace-nowrap px-3">
+                        <div class="w-4 flex-none flex justify-center ${styles.text} mr-1">
+                          ${line.changeType === 'removed' ? styles.sign : ' '}
+                        </div>
+                        <code class="${styles.text}">${line.originalLine || ' '}</code>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+              
+              <!-- Secure code panel (right side) -->
+              <div id="aegis-fullscreen-right" class="w-1/2 overflow-auto" style="scrollbar-width: thin;">
+                ${diff.map((line, index) => {
+                  const styles = getChangeTypeStylesForHTML(line.changeType);
+                  const hasExplanation = line.explanation && (line.changeType === 'added' || line.changeType === 'modified');
+                  
+                  return `
+                    <div class="h-6 relative ${line.changeType === 'removed' ? 'opacity-50' : ''} ${styles.bg} border-b border-zinc-100 dark:border-zinc-900 ${hasExplanation ? 'aegis-tooltip-trigger' : ''}">
+                      <div class="flex whitespace-nowrap px-3">
+                        <div class="w-4 flex-none flex justify-center ${styles.text} mr-1">
+                          ${line.changeType === 'added' || line.changeType === 'modified' ? styles.sign : ' '}
+                        </div>
+                        <code class="${styles.text}">
+                          ${line.securedLine || ' '}
+                          ${hasExplanation ? `
+                            <span class="aegis-info-icon">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                                <path d="M12 8l.01 0" />
+                                <path d="M11 12h1v4h1" />
+                              </svg>
+                            </span>
+                          ` : ''}
+                        </code>
+                        ${hasExplanation ? `
+                          <div class="aegis-tooltip">
+                            ${line.explanation}
+                          </div>
+                        ` : ''}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Inject the content into the container
+    container.innerHTML = content;
+    
+    // Add event listeners
+    const exitButton = container.querySelector('#aegis-fullscreen-exit');
+    if (exitButton) {
+      exitButton.addEventListener('click', () => {
+        setIsFullScreen(false);
+      });
+    }
+    
+    const copyButton = container.querySelector('#aegis-fullscreen-copy');
+    if (copyButton) {
+      copyButton.addEventListener('click', () => {
+        navigator.clipboard.writeText(secureCode);
+        copyButton.innerHTML = `
+          <svg class="w-3.5 h-3.5 mr-1.5 text-emerald-500" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M5 12l5 5l10 -10" />
+          </svg>
+          <span>Copied!</span>
+        `;
+        setTimeout(() => {
+          copyButton.innerHTML = `
+            <svg class="w-3.5 h-3.5 mr-1.5" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+              <path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z" />
+              <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
+            </svg>
+            <span>Copy Secure Code</span>
+          `;
+        }, 2000);
+      });
+    }
+  };
+  
+  // Helper function to convert style objects to HTML class strings
+  const getChangeTypeStylesForHTML = (changeType: string) => {
+    const styles = getChangeTypeStyles(changeType);
+    return {
+      bg: changeType === 'added' 
+        ? 'bg-green-50 dark:bg-green-950/30' 
+        : changeType === 'removed'
+        ? 'bg-red-50 dark:bg-red-950/30'
+        : changeType === 'modified'
+        ? 'bg-yellow-50 dark:bg-yellow-950/30'
+        : '',
+      text: changeType === 'added'
+        ? 'text-green-800 dark:text-green-300'
+        : changeType === 'removed'
+        ? 'text-red-800 dark:text-red-300'
+        : changeType === 'modified'
+        ? 'text-yellow-800 dark:text-yellow-300'
+        : 'text-zinc-700 dark:text-zinc-300',
+      sign: changeType === 'added'
+        ? '+'
+        : changeType === 'removed'
+        ? '-'
+        : changeType === 'modified'
+        ? '~'
+        : ' '
+    };
+  };
+  
+  // Remove synchronized scrolling from the regular view as well
+  useEffect(() => {
+    // This effect is now empty to disable synchronized scrolling
+    return () => {};
+  }, [showDiffView, diff]);
+  
+  // Add escape key handler for exiting full-screen mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullScreen) {
+        setIsFullScreen(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFullScreen]);
 
   async function onSubmit() {
     try {
@@ -63,6 +432,7 @@ export default function AegisChatBot() {
       
       setSecureCode(result.secureCode)
       setVulnerabilities(result.vulnerabilities)
+      setDiff(result.diff || [])
     } catch (error) {
       console.error('Error generating secure code:', error)
     } finally {
@@ -73,15 +443,84 @@ export default function AegisChatBot() {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'high':
-        return 'text-red-500 bg-red-500/10 border-red-500/20'
+        return {
+          bg: 'bg-gradient-to-r from-red-500/10 via-red-500/5 to-red-500/10',
+          border: 'border-red-500/20',
+          text: 'text-zinc-600 dark:text-zinc-400',
+          icon: 'text-red-500',
+          badge: 'bg-red-500/10 border-red-500/30 text-red-500',
+          title: 'text-red-800 dark:text-red-300 font-medium',
+          highlight: 'bg-red-50 dark:bg-red-500/10'
+        }
       case 'medium':
-        return 'text-orange-500 bg-orange-500/10 border-orange-500/20'
+        return {
+          bg: 'bg-gradient-to-r from-orange-500/10 via-orange-500/5 to-orange-500/10',
+          border: 'border-orange-500/20',
+          text: 'text-zinc-600 dark:text-zinc-400',
+          icon: 'text-orange-500',
+          badge: 'bg-orange-500/10 border-orange-500/30 text-orange-500',
+          title: 'text-orange-800 dark:text-orange-300 font-medium',
+          highlight: 'bg-orange-50 dark:bg-orange-500/10'
+        }
       case 'low':
-        return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20'
+        return {
+          bg: 'bg-gradient-to-r from-yellow-500/10 via-yellow-500/5 to-yellow-500/10',
+          border: 'border-yellow-500/20',
+          text: 'text-zinc-600 dark:text-zinc-400',
+          icon: 'text-yellow-500',
+          badge: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500',
+          title: 'text-yellow-800 dark:text-yellow-300 font-medium',
+          highlight: 'bg-yellow-50 dark:bg-yellow-500/10'
+        }
       default:
-        return 'text-gray-500 bg-gray-500/10 border-gray-500/20'
+        return {
+          bg: 'bg-gradient-to-r from-zinc-500/10 via-zinc-500/5 to-zinc-500/10',
+          border: 'border-zinc-500/20',
+          text: 'text-zinc-600 dark:text-zinc-400',
+          icon: 'text-zinc-500',
+          badge: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-500',
+          title: 'text-zinc-800 dark:text-zinc-300 font-medium',
+          highlight: 'bg-zinc-50 dark:bg-zinc-500/10'
+        }
     }
   }
+
+  const getChangeTypeStyles = (changeType: string) => {
+    switch (changeType) {
+      case 'added':
+        return {
+          bg: 'bg-green-50 dark:bg-green-950/30',
+          border: 'border-green-200 dark:border-green-800/30',
+          text: 'text-green-800 dark:text-green-300',
+          indicator: 'bg-green-500',
+          sign: '+'
+        };
+      case 'removed':
+        return {
+          bg: 'bg-red-50 dark:bg-red-950/30',
+          border: 'border-red-200 dark:border-red-800/30',
+          text: 'text-red-800 dark:text-red-300',
+          indicator: 'bg-red-500',
+          sign: '-'
+        };
+      case 'modified':
+        return {
+          bg: 'bg-yellow-50 dark:bg-yellow-950/30',
+          border: 'border-yellow-200 dark:border-yellow-800/30',
+          text: 'text-yellow-800 dark:text-yellow-300',
+          indicator: 'bg-yellow-500',
+          sign: '~'
+        };
+      default:
+        return {
+          bg: '',
+          border: '',
+          text: 'text-zinc-700 dark:text-zinc-300',
+          indicator: 'bg-transparent',
+          sign: ' '
+        };
+    }
+  };
 
   const toggleVulnerability = (index: number) => {
     if (expandedVulnerability === index) {
@@ -103,8 +542,55 @@ export default function AegisChatBot() {
     }
   };
 
+  const toggleFullScreen = () => {
+    setIsFullScreen(!isFullScreen);
+  };
+
+  // Enhance scrollToLine function to highlight the line
+  const scrollToLine = (lineNumber: number) => {
+    const editorElement = document.querySelector('textarea');
+    if (!editorElement) return;
+    
+    // Get all lines in the editor
+    const text = editorElement.value;
+    const lines = text.split('\n');
+    
+    // Calculate position of the line
+    let position = 0;
+    let lineStartPosition = 0;
+    
+    for (let i = 0; i < Math.min(lineNumber - 1, lines.length - 1); i++) {
+      position += lines[i].length + 1; // +1 for the newline character
+    }
+    
+    lineStartPosition = position;
+    
+    // Calculate position of the end of the line
+    if (lineNumber <= lines.length) {
+      position += lines[lineNumber - 1].length;
+    }
+    
+    // Focus the editor and select the whole line to highlight it
+    editorElement.focus();
+    editorElement.setSelectionRange(lineStartPosition, position);
+    
+    // Scroll to the line
+    const lineHeight = 24; // Approximate line height in pixels
+    const scrollTop = (lineNumber - 5) * lineHeight; // 5 lines above for context
+    editorElement.scrollTop = Math.max(0, scrollTop);
+    
+    // Flash effect to highlight the line
+    setTimeout(() => {
+      editorElement.blur();
+      setTimeout(() => {
+        editorElement.focus();
+        editorElement.setSelectionRange(lineStartPosition, position);
+      }, 100);
+    }, 100);
+  }
+
   return (
-    <div className="max-w-4xl w-full mx-auto relative z-10 flex items-center space-x-4 rounded-sm flex-col bg-zinc-950/50 p-10 ring-1 ring-white/10 backdrop-blur-md">
+    <div className="max-w-6xl w-full mx-auto relative z-10 flex items-center space-x-4 rounded-sm flex-col bg-zinc-950/50 p-10 ring-1 ring-white/10 backdrop-blur-md">
       <h2 className="text-2xl font-medium text-zinc-800 dark:text-zinc-100 mb-6">
         AegisAI – Secure Code Generator
       </h2>
@@ -163,92 +649,320 @@ export default function AegisChatBot() {
 
       {vulnerabilities.length > 0 && (
         <div className="w-full mb-6">
-          <h3 className="text-lg font-medium text-zinc-800 dark:text-zinc-200 mb-4 flex items-center">
-            <IconAlertTriangle className="w-5 h-5 mr-2 text-amber-500" />
-            Vulnerabilities Detected ({vulnerabilities.length})
-          </h3>
-          <div className="space-y-3">
-            {vulnerabilities.map((vulnerability, index) => (
-              <div 
-                key={index}
-                className="border border-zinc-800 rounded-lg overflow-hidden"
-              >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-zinc-800 dark:text-zinc-100 flex items-center">
+              <IconShield className="w-5 h-5 mr-2 text-indigo-500" />
+              Vulnerabilities Detected
+            </h3>
+            <div className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium">
+              {vulnerabilities.length} {vulnerabilities.length === 1 ? 'issue' : 'issues'} found
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            {vulnerabilities.map((vulnerability, index) => {
+              const colors = getSeverityColor(vulnerability.severity);
+              // Extract line number for scroll functionality
+              const lineNumberMatch = vulnerability.location && vulnerability.location.match(/Line (\d+)/i);
+              const lineNumber = lineNumberMatch ? parseInt(lineNumberMatch[1]) : null;
+              
+              return (
                 <div 
-                  className={`px-4 py-3 flex justify-between items-center cursor-pointer ${getSeverityColor(vulnerability.severity)}`}
-                  onClick={() => toggleVulnerability(index)}
+                  key={index}
+                  className={`rounded-xl overflow-hidden shadow-md transition-all duration-200 ${
+                    expandedVulnerability === index 
+                      ? 'ring-1 ring-zinc-300/20 dark:ring-zinc-700/30' 
+                      : 'hover:shadow-lg'
+                  }`}
                 >
-                  <div className="flex items-center">
-                    <IconAlertCircle className="w-5 h-5 mr-2" />
-                    <span className="font-medium">{vulnerability.description.split('.')[0]}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-xs uppercase font-semibold mr-3 px-2 py-1 rounded-full border">
-                      {vulnerability.severity}
-                    </span>
-                    {expandedVulnerability === index ? (
-                      <IconChevronUp className="w-5 h-5" />
-                    ) : (
-                      <IconChevronDown className="w-5 h-5" />
-                    )}
-                  </div>
-                </div>
-                {expandedVulnerability === index && (
-                  <div className="px-4 py-3 bg-zinc-900 text-zinc-200 border-t border-zinc-800">
-                    <div className="mb-2">
-                      <span className="text-zinc-400 text-sm">Description:</span>
-                      <p className="mt-1">{vulnerability.description}</p>
+                  <div 
+                    className={`px-4 py-3 flex justify-between items-center cursor-pointer ${colors.bg} ${colors.border} border-b transition-colors duration-200`}
+                    onClick={() => toggleVulnerability(index)}
+                  >
+                    <div className="flex items-center">
+                      <IconBug className={`w-5 h-5 mr-3 ${colors.icon}`} />
+                      <span className={`font-medium text-zinc-900 dark:text-zinc-50`}>
+                        {vulnerability.description.split('.')[0]}
+                      </span>
                     </div>
-                    {vulnerability.location && (
-                      <div className="mb-2">
-                        <span className="text-zinc-400 text-sm">Location:</span>
-                        <p className="mt-1">{vulnerability.location}</p>
+                    <div className="flex items-center space-x-3">
+                      <span className={`text-xs uppercase font-semibold px-2.5 py-0.5 rounded-full border ${colors.badge}`}>
+                        {vulnerability.severity}
+                      </span>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                        expandedVulnerability === index 
+                          ? 'bg-indigo-500/10 text-indigo-500' 
+                          : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
+                      } transition-colors duration-200`}>
+                        {expandedVulnerability === index ? (
+                          <IconChevronUp className="w-4 h-4" />
+                        ) : (
+                          <IconChevronDown className="w-4 h-4" />
+                        )}
                       </div>
-                    )}
-                    {vulnerability.solution && (
-                      <div className="mb-2">
-                        <span className="text-zinc-400 text-sm">Solution:</span>
-                        <p className="mt-1">{vulnerability.solution}</p>
-                      </div>
-                    )}
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+                  
+                  {expandedVulnerability === index && (
+                    <div className="bg-white dark:bg-zinc-900 p-4 text-zinc-800 dark:text-zinc-100 border-t border-zinc-200 dark:border-zinc-800">
+                      <div className="space-y-4">
+                        <div>
+                          <div className="flex items-center text-sm mb-2">
+                            <IconAlertCircle className={`w-4 h-4 mr-2 ${colors.icon}`} />
+                            <span className={colors.title}>Description</span>
+                          </div>
+                          <p className={`ml-6 ${colors.text}`}>
+                            {vulnerability.description}
+                          </p>
+                        </div>
+                        
+                        {vulnerability.location && (
+                          <div>
+                            <div className="flex items-center text-sm mb-2">
+                              <IconMapPin className={`w-4 h-4 mr-2 ${colors.icon}`} />
+                              <span className={colors.title}>Location</span>
+                            </div>
+                            <div 
+                              className={`ml-6 px-3 py-2 rounded group cursor-pointer ${colors.highlight} border border-zinc-200 dark:border-zinc-700/50 font-mono text-xs text-zinc-800 dark:text-zinc-200 flex items-center space-x-1 hover:shadow-md transition-shadow`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (lineNumber) scrollToLine(lineNumber);
+                              }}
+                              title={lineNumber ? `Click to highlight line ${lineNumber} in the code editor` : ''}
+                            >
+                              <IconCode size={14} className={`${colors.icon} flex-shrink-0`} />
+                              <div className="flex-1">
+                                {lineNumber ? (
+                                  <>
+                                    <span>
+                                      {vulnerability.location.split('Line ')[0]}Line 
+                                    </span>
+                                    <span className="font-bold underline decoration-dotted underline-offset-2">
+                                      {lineNumber}
+                                    </span>
+                                    <span>
+                                      {vulnerability.location.split(`Line ${lineNumber}`)[1]}
+                                    </span>
+                                  </>
+                                ) : (
+                                  vulnerability.location
+                                )}
+                              </div>
+                              {lineNumber && (
+                                <div className="flex-shrink-0 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded text-xs font-medium hidden group-hover:block">
+                                  Jump to code
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {vulnerability.solution && (
+                          <div>
+                            <div className="flex items-center text-sm mb-2">
+                              <IconTools className="w-4 h-4 mr-2 text-emerald-500" />
+                              <span className="text-emerald-800 dark:text-emerald-300 font-medium">Solution</span>
+                            </div>
+                            <p className="ml-6 text-emerald-600/80 dark:text-emerald-400/90">
+                              {vulnerability.solution}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
       {secureCode && (
-        <div className="mt-6 w-full max-h-[400px] overflow-auto">
-          <h3 className="text-lg font-medium text-zinc-800 dark:text-zinc-200 mb-2">
-            Generated Secure Code:
-          </h3>
-          <div className="rounded-lg overflow-hidden shadow-lg ring-1 ring-zinc-400/10 dark:ring-zinc-700/30">
-            <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-800 border-b border-zinc-300/70 dark:border-zinc-700/80">
-              <div className="flex items-center">
-                <IconCode className="w-4 h-4 mr-2 text-emerald-500 dark:text-emerald-400" />
-                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Secure Code</span>
-              </div>
-              <button 
-                onClick={copyToClipboard}
-                className="flex items-center text-xs px-2 py-1 rounded bg-zinc-200/70 dark:bg-zinc-700/70 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
-              >
-                {isCopied ? (
-                  <>
-                    <IconCheck className="w-3.5 h-3.5 mr-1 text-emerald-500" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <IconCopy className="w-3.5 h-3.5 mr-1" />
-                    <span>Copy code</span>
-                  </>
+        <div className="mt-6 w-full overflow-hidden">
+          <div className="relative">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-medium text-zinc-800 dark:text-zinc-200 flex items-center">
+                Generated Secure Code
+              </h3>
+              <div className="flex items-center gap-2">
+                {diff.length > 0 && (
+                  <button
+                    onClick={() => setShowDiffView(!showDiffView)}
+                    className="flex items-center space-x-1 px-3 py-1 rounded-md bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs hover:bg-indigo-200 dark:hover:bg-indigo-800/40 transition-colors"
+                  >
+                    {showDiffView ? (
+                      <>
+                        <IconCode className="w-3.5 h-3.5" />
+                        <span>Show Clean View</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconColumns className="w-3.5 h-3.5" />
+                        <span>Show Diff View</span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+                {showDiffView && (
+                  <button
+                    onClick={toggleFullScreen}
+                    className="flex items-center space-x-1 px-3 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  >
+                    <IconMaximize className="w-3.5 h-3.5" />
+                    <span>Full Screen</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <pre className="bg-gradient-to-b from-zinc-50/90 to-white dark:from-slate-900/90 dark:to-slate-950 p-4 overflow-x-auto text-sm text-left text-zinc-800 dark:text-zinc-100 font-mono">
-              <code>{secureCode}</code>
-            </pre>
+
+            {!showDiffView ? (
+              <div className="max-h-[400px] overflow-auto rounded-lg shadow-lg ring-1 ring-zinc-400/10 dark:ring-zinc-700/30">
+                <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-800 border-b border-zinc-300/70 dark:border-zinc-700/80">
+                  <div className="flex items-center">
+                    <IconCode className="w-4 h-4 mr-2 text-emerald-500 dark:text-emerald-400" />
+                    <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Secure Code</span>
+                  </div>
+                  <button 
+                    onClick={copyToClipboard}
+                    className="flex items-center text-xs px-2 py-1 rounded bg-zinc-200/70 dark:bg-zinc-700/70 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                  >
+                    {isCopied ? (
+                      <>
+                        <IconCheck className="w-3.5 h-3.5 mr-1 text-emerald-500" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconCopy className="w-3.5 h-3.5 mr-1" />
+                        <span>Copy code</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <pre className="bg-gradient-to-b from-zinc-50/90 to-white dark:from-slate-900/90 dark:to-slate-950 p-4 overflow-x-auto text-sm text-left text-zinc-800 dark:text-zinc-100 font-mono">
+                  <code>{secureCode}</code>
+                </pre>
+              </div>
+            ) : (
+              <div className="max-h-[500px] overflow-hidden rounded-lg shadow-lg ring-1 ring-zinc-400/10 dark:ring-zinc-700/30 transition-all duration-300" ref={diffContainerRef}>
+                <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-2 bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-800 border-b border-zinc-300/70 dark:border-zinc-700/80">
+                  <div className="flex items-center">
+                    <IconExchange className="w-4 h-4 mr-2 text-indigo-500 dark:text-indigo-400" />
+                    <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Code Comparison</span>
+                  </div>
+                  <button 
+                    onClick={copyToClipboard}
+                    className="flex items-center text-xs px-2 py-1 rounded bg-zinc-200/70 dark:bg-zinc-700/70 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                  >
+                    {isCopied ? (
+                      <>
+                        <IconCheck className="w-3.5 h-3.5 mr-1 text-emerald-500" />
+                        <span>Copied Secure Code</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconCopy className="w-3.5 h-3.5 mr-1" />
+                        <span>Copy Secure Code</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                <div className="flex text-xs font-medium border-b border-zinc-200 dark:border-zinc-800">
+                  <div className="w-1/2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-r border-zinc-200 dark:border-zinc-700">
+                    Original Code
+                  </div>
+                  <div className="w-1/2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                    Secure Code
+                  </div>
+                </div>
+                
+                <div className="font-mono text-sm relative overflow-hidden h-[400px]">
+                  {/* Fixed center divider line */}
+                  <div className="absolute top-0 bottom-0 left-1/2 w-px bg-zinc-200 dark:bg-zinc-800 transform -translate-x-[0.5px] z-10"></div>
+                  
+                  {/* Line numbers column and original code panel */}
+                  <div className="flex h-full">
+                    <div className="sticky left-0 z-20 flex-none w-10 bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800">
+                      {diff.map((line, index) => (
+                        <div key={`line-${index}`} className="h-6 text-center text-xs text-zinc-500 dark:text-zinc-500 leading-6">
+                          {line.lineNumber}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Scrollable code content */}
+                    <div className="flex overflow-x-auto w-full">
+                      {/* Original code panel (left side) */}
+                      <div 
+                        ref={leftPanelRef}
+                        className="w-1/2 overflow-x-auto"
+                      >
+                        {diff.map((line, index) => {
+                          const styles = getChangeTypeStyles(line.changeType);
+                          return (
+                            <div 
+                              key={`left-${index}`} 
+                              className={`h-6 ${line.changeType === 'added' ? 'opacity-50' : ''} ${styles.bg} border-b border-zinc-100 dark:border-zinc-900`}
+                            >
+                              <div className="flex whitespace-nowrap">
+                                <div className={`w-5 flex-none flex justify-center ${styles.text}`}>
+                                  {line.changeType === 'removed' ? styles.sign : ' '}
+                                </div>
+                                <pre className={`py-0 overflow-visible ${styles.text}`}>
+                                  <code>{line.originalLine || ' '}</code>
+                                </pre>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Secure code panel (right side) */}
+                      <div 
+                        ref={rightPanelRef}
+                        className="w-1/2 overflow-x-auto pl-[10px]"
+                      >
+                        {diff.map((line, index) => {
+                          const styles = getChangeTypeStyles(line.changeType);
+                          const hasExplanation = line.explanation && (line.changeType === 'added' || line.changeType === 'modified');
+                          
+                          return (
+                            <div 
+                              key={`right-${index}`} 
+                              className={`h-6 ${line.changeType === 'removed' ? 'opacity-50' : ''} ${styles.bg} border-b border-zinc-100 dark:border-zinc-900 relative group`}
+                            >
+                              <div className="flex whitespace-nowrap">
+                                <div className={`w-5 flex-none flex justify-center ${styles.text}`}>
+                                  {line.changeType === 'added' || line.changeType === 'modified' ? styles.sign : ' '}
+                                </div>
+                                <pre className={`py-0 overflow-visible ${styles.text}`}>
+                                  <code>
+                                    {line.securedLine || ' '}
+                                    {hasExplanation && (
+                                      <span className="inline-flex ml-1 text-indigo-500 dark:text-indigo-400">
+                                        <IconInfoCircle size={14} className="inline" />
+                                      </span>
+                                    )}
+                                  </code>
+                                </pre>
+                                
+                                {hasExplanation && (
+                                  <div className="absolute left-0 -top-12 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs p-2 rounded-md shadow-lg border border-zinc-200 dark:border-zinc-700 max-w-[250px] whitespace-normal break-words">
+                                    {line.explanation}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
