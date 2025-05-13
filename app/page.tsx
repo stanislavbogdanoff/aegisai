@@ -20,6 +20,9 @@ export default function Home() {
       <div className="h-screen w-full flex items-center justify-center gap-[20px]">
         <HeroSection />
       </div>
+      <div className="h-screen w-full flex flex-col items-center justify-center">
+        <AIChatbot />
+      </div>
       <div className="h-screen flex flex-col items-center justify-center gap-[20px]">
         <motion.h3
           initial={{ opacity: 0, y: 100 }}
@@ -53,9 +56,7 @@ export default function Home() {
       <div className="h-screen flex flex-col items-center justify-center">
         <ConceptShowcase />
       </div>
-      <div className="h-screen w-full flex flex-col items-center justify-center">
-        <AIChatbot />
-      </div>
+
       <Footer />
     </main>
   )
