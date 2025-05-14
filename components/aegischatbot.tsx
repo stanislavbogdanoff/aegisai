@@ -31,6 +31,102 @@ const SAMPLE_RESPONSE: SecureCodeResponse = {
       cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
       location: "Line 2 where input is used directly",
       solution: "Added input sanitization using DOMPurify before processing user input."
+    },
+    {
+      description: "Insecure Direct Object Reference (IDOR) vulnerability allows attackers to access unauthorized resources by manipulating reference parameters.",
+      severity: "high",
+      cvssScore: 7.5,
+      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N",
+      location: "Line 5 in function getUserData()",
+      solution: "Implemented proper authorization checks before accessing user data."
+    },
+    {
+      description: "Path Traversal vulnerability allows attackers to access files and directories outside of the intended directory through manipulating file paths.",
+      severity: "high",
+      cvssScore: 7.7,
+      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:N",
+      location: "Line 12 in fileDownload function",
+      solution: "Used path normalization and validation to prevent directory traversal."
+    },
+    {
+      description: "Insecure cryptographic storage due to the use of an outdated and weak hashing algorithm (MD5) for password storage.",
+      severity: "medium",
+      cvssScore: 6.5,
+      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+      location: "Line 23 in hashPassword function",
+      solution: "Replaced MD5 with bcrypt, a strong adaptive hashing function designed specifically for password hashing."
+    },
+    {
+      description: "Open Redirect vulnerability allows attackers to redirect users to malicious websites by manipulating the redirect URL parameter.",
+      severity: "medium",
+      cvssScore: 5.4,
+      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+      location: "Line 38 in redirect function",
+      solution: "Implemented URL validation and whitelist of allowed domains for redirects."
+    },
+    {
+      description: "XML External Entity (XXE) vulnerability allows attackers to read sensitive files or perform server side request forgery by injecting malicious XML.",
+      severity: "high",
+      cvssScore: 8.2,
+      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:L",
+      location: "Line 45 in processXML function",
+      solution: "Disabled external entity processing in the XML parser configuration."
+    },
+    {
+      description: "Hardcoded credentials in the source code expose sensitive authentication information that could lead to unauthorized access.",
+      severity: "high",
+      cvssScore: 9.1,
+      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+      location: "Line 57 - Database connection string",
+      solution: "Moved credentials to environment variables and implemented secure configuration management."
+    },
+    {
+      description: "Insecure random number generation using Math.random() which is not cryptographically secure and can be predicted.",
+      severity: "low",
+      cvssScore: 3.7,
+      cvssVector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N",
+      location: "Line 72 in generateToken function",
+      solution: "Used the crypto.getRandomValues() API for cryptographically secure random values."
+    },
+    {
+      description: "Missing rate limiting could allow brute force attacks against authentication endpoints.",
+      severity: "medium",
+      cvssScore: 5.3,
+      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N",
+      location: "Line 89 in login function",
+      solution: "Implemented rate limiting and account lockout mechanisms after multiple failed attempts."
+    },
+    {
+      description: "Improper certificate validation bypasses TLS security by accepting any certificate without verification.",
+      severity: "high",
+      cvssScore: 8.1,
+      cvssVector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H",
+      location: "Line 103 in HTTP client configuration",
+      solution: "Enabled proper certificate validation in the HTTP client."
+    },
+    {
+      description: "Sensitive data exposure through detailed error messages that reveal implementation details and stack traces.",
+      severity: "low",
+      cvssScore: 3.5,
+      cvssVector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N",
+      location: "Line 134 in error handling",
+      solution: "Implemented generic error messages for production and proper logging for debugging."
+    },
+    {
+      description: "Cross-Site Request Forgery (CSRF) vulnerability allows attackers to perform actions on behalf of authenticated users who visit a malicious website.",
+      severity: "medium",
+      cvssScore: 6.4,
+      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:H/A:N",
+      location: "Line 149 in form handling",
+      solution: "Implemented anti-CSRF tokens for all sensitive operations."
+    },
+    {
+      description: "Missing Content Security Policy (CSP) header increases risk of XSS and other client-side attacks.",
+      severity: "low",
+      cvssScore: 3.9,
+      cvssVector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:L/A:N",
+      location: "Line 167 in HTTP response headers",
+      solution: "Added a strict Content Security Policy header to restrict resource loading."
     }
   ],
   diff: [
@@ -106,6 +202,13 @@ export default function AegisChatBot() {
   const [isCopied, setIsCopied] = useState(false)
   const [showDiffView, setShowDiffView] = useState(false)
   const [isFullScreen, setIsFullScreen] = useState(false)
+  
+  // New state variables for filtering, sorting, and pagination
+  const [severityFilter, setSeverityFilter] = useState<string[]>(['high', 'medium', 'low'])
+  const [sortBy, setSortBy] = useState<'severity' | 'cvssScore'>('cvssScore')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
   
   // Refs for synchronized scrolling
   const leftPanelRef = useRef<HTMLDivElement>(null);
@@ -646,6 +749,74 @@ export default function AegisChatBot() {
     }, 100);
   }
 
+  // Helper function to sort vulnerabilities
+  const sortVulnerabilities = (vulns: Vulnerability[]) => {
+    return [...vulns].sort((a, b) => {
+      if (sortBy === 'severity') {
+        const severityOrder = { high: 3, medium: 2, low: 1 };
+        const aValue = severityOrder[a.severity as keyof typeof severityOrder] || 0;
+        const bValue = severityOrder[b.severity as keyof typeof severityOrder] || 0;
+        return sortDirection === 'desc' ? bValue - aValue : aValue - bValue;
+      } else {
+        // Sort by CVSS score
+        const aScore = a.cvssScore || 0;
+        const bScore = b.cvssScore || 0;
+        return sortDirection === 'desc' ? bScore - aScore : aScore - bScore;
+      }
+    });
+  };
+  
+  // Helper function to filter vulnerabilities
+  const filterVulnerabilities = (vulns: Vulnerability[]) => {
+    return vulns.filter(v => severityFilter.includes(v.severity));
+  };
+  
+  // Apply filters and sorting to get displayed vulnerabilities
+  const getFilteredAndSortedVulnerabilities = () => {
+    const filtered = filterVulnerabilities(vulnerabilities);
+    return sortVulnerabilities(filtered);
+  };
+  
+  // Get current page items
+  const getCurrentPageItems = () => {
+    const filteredAndSorted = getFilteredAndSortedVulnerabilities();
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    return filteredAndSorted.slice(indexOfFirstItem, indexOfLastItem);
+  };
+  
+  // Calculate total pages
+  const totalPages = Math.ceil(getFilteredAndSortedVulnerabilities().length / itemsPerPage);
+  
+  // Change page
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  
+  // Toggle severity filter
+  const toggleSeverityFilter = (severity: string) => {
+    if (severityFilter.includes(severity)) {
+      // If removing the last filter, don't allow it
+      if (severityFilter.length === 1) return;
+      setSeverityFilter(severityFilter.filter(s => s !== severity));
+    } else {
+      setSeverityFilter([...severityFilter, severity]);
+    }
+    // Reset to first page when filter changes
+    setCurrentPage(1);
+  };
+  
+  // Handle sort change
+  const handleSortChange = (sortType: 'severity' | 'cvssScore') => {
+    if (sortBy === sortType) {
+      // Toggle direction if clicking the same sort option
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(sortType);
+      setSortDirection('desc'); // Default to descending when changing sort type
+    }
+    // Reset to first page when sort changes
+    setCurrentPage(1);
+  };
+
   return (
     <div className="max-w-6xl w-full mx-auto relative z-10 flex items-center space-x-4 rounded-sm flex-col bg-zinc-950/50 p-10 ring-1 ring-white/10 backdrop-blur-md">
       <h2 className="text-2xl font-medium text-zinc-800 dark:text-zinc-100 mb-6">
@@ -712,255 +883,405 @@ export default function AegisChatBot() {
               Vulnerabilities Detected
             </h3>
             <div className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium">
-              {vulnerabilities.length} {vulnerabilities.length === 1 ? 'issue' : 'issues'} found
+              {getFilteredAndSortedVulnerabilities().length} of {vulnerabilities.length} {vulnerabilities.length === 1 ? 'issue' : 'issues'} shown
+            </div>
+          </div>
+          
+          {/* Controls for filtering and sorting */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4 items-start sm:items-center">
+            <div className="flex flex-wrap gap-2">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400 self-center">Filter:</span>
+              <button
+                onClick={() => toggleSeverityFilter('high')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  severityFilter.includes('high')
+                    ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${severityFilter.includes('high') ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                High
+              </button>
+              <button
+                onClick={() => toggleSeverityFilter('medium')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  severityFilter.includes('medium')
+                    ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${severityFilter.includes('medium') ? 'bg-orange-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                Medium
+              </button>
+              <button
+                onClick={() => toggleSeverityFilter('low')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  severityFilter.includes('low')
+                    ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${severityFilter.includes('low') ? 'bg-yellow-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                Low
+              </button>
+            </div>
+            
+            <div className="flex-1" />
+            
+            <div className="flex flex-wrap gap-2">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400 self-center">Sort by:</span>
+              <button
+                onClick={() => handleSortChange('severity')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  sortBy === 'severity'
+                    ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                Severity
+                {sortBy === 'severity' && (
+                  sortDirection === 'desc' 
+                    ? <IconChevronDown className="w-3 h-3" /> 
+                    : <IconChevronUp className="w-3 h-3" />
+                )}
+              </button>
+              <button
+                onClick={() => handleSortChange('cvssScore')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  sortBy === 'cvssScore'
+                    ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                CVSS Score
+                {sortBy === 'cvssScore' && (
+                  sortDirection === 'desc' 
+                    ? <IconChevronDown className="w-3 h-3" /> 
+                    : <IconChevronUp className="w-3 h-3" />
+                )}
+              </button>
             </div>
           </div>
           
           <div className="space-y-4">
-            {vulnerabilities.map((vulnerability, index) => {
-              const colors = getSeverityColor(vulnerability.severity);
-              // Extract line number for scroll functionality
-              const lineNumberMatch = vulnerability.location && vulnerability.location.match(/Line (\d+)/i);
-              const lineNumber = lineNumberMatch ? parseInt(lineNumberMatch[1]) : null;
-              
-              return (
-                <div 
-                  key={index}
-                  className={`rounded-xl overflow-hidden shadow-md transition-all duration-200 ${
-                    expandedVulnerability === index 
-                      ? 'ring-1 ring-zinc-300/20 dark:ring-zinc-700/30' 
-                      : 'hover:shadow-lg'
-                  }`}
-                >
+            {getCurrentPageItems().length > 0 ? (
+              getCurrentPageItems().map((vulnerability, index) => {
+                const colors = getSeverityColor(vulnerability.severity);
+                // Extract line number for scroll functionality
+                const lineNumberMatch = vulnerability.location && vulnerability.location.match(/Line (\d+)/i);
+                const lineNumber = lineNumberMatch ? parseInt(lineNumberMatch[1]) : null;
+                const actualIndex = getFilteredAndSortedVulnerabilities().indexOf(vulnerability);
+                
+                return (
                   <div 
-                    className={`px-4 py-3 flex justify-between items-center cursor-pointer ${colors.bg} ${colors.border} border-b transition-colors duration-200`}
-                    onClick={() => toggleVulnerability(index)}
+                    key={index}
+                    className={`rounded-xl overflow-hidden shadow-md transition-all duration-200 ${
+                      expandedVulnerability === actualIndex 
+                        ? 'ring-1 ring-zinc-300/20 dark:ring-zinc-700/30' 
+                        : 'hover:shadow-lg'
+                    }`}
                   >
-                    <div className="flex items-center">
-                      <IconBug className={`w-5 h-5 mr-3 ${colors.icon}`} />
-                      <span className={`font-medium text-zinc-900 dark:text-zinc-50`}>
-                        {vulnerability.description.split('.')[0]}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <span className={`text-xs uppercase font-semibold px-2.5 py-0.5 rounded-full border ${colors.badge}`}>
-                        {vulnerability.severity}
-                      </span>
-                      {vulnerability.cvssScore && (
-                        <span 
-                          className={`text-xs font-mono px-2 py-0.5 rounded-full border ${vulnerability.cvssScore >= 9.0 ? 'border-red-500/30 bg-red-500/10 text-red-500 font-bold' : vulnerability.cvssScore >= 7.0 ? 'border-red-500/30 bg-red-500/10 text-red-500' : vulnerability.cvssScore >= 4.0 ? 'border-orange-500/30 bg-orange-500/10 text-orange-500' : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-500'} relative group cursor-help`}
-                          title="Common Vulnerability Scoring System"
-                        >
-                          {vulnerability.cvssScore.toFixed(1)}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-1 w-40 bg-white dark:bg-zinc-800 shadow-lg rounded-md p-2 text-xs text-left text-zinc-700 dark:text-zinc-300 invisible group-hover:visible z-10 border border-zinc-200 dark:border-zinc-700">
-                            <div className="font-semibold mb-1 text-zinc-900 dark:text-zinc-100">CVSS Score: {vulnerability.cvssScore.toFixed(1)}</div>
-                            <div>
-                              <span className="font-medium">Risk: </span> 
-                              {getCvssRiskLevel(vulnerability.cvssScore)}
-                            </div>
-                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">
-                              Common Vulnerability Scoring System measures the severity of vulnerabilities
-                            </div>
-                          </div>
+                    <div 
+                      className={`px-4 py-3 flex justify-between items-center cursor-pointer ${colors.bg} ${colors.border} border-b transition-colors duration-200`}
+                      onClick={() => toggleVulnerability(actualIndex)}
+                    >
+                      <div className="flex items-center">
+                        <IconBug className={`w-5 h-5 mr-3 ${colors.icon}`} />
+                        <span className={`font-medium text-zinc-900 dark:text-zinc-50`}>
+                          {vulnerability.description.split('.')[0]}
                         </span>
-                      )}
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        expandedVulnerability === index 
-                          ? 'bg-indigo-500/10 text-indigo-500' 
-                          : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
-                      } transition-colors duration-200`}>
-                        {expandedVulnerability === index ? (
-                          <IconChevronUp className="w-4 h-4" />
-                        ) : (
-                          <IconChevronDown className="w-4 h-4" />
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className={`text-xs uppercase font-semibold px-2.5 py-0.5 rounded-full border ${colors.badge}`}>
+                          {vulnerability.severity}
+                        </span>
+                        {vulnerability.cvssScore && (
+                          <span 
+                            className={`text-xs font-mono px-2 py-0.5 rounded-full border ${vulnerability.cvssScore >= 9.0 ? 'border-red-500/30 bg-red-500/10 text-red-500 font-bold' : vulnerability.cvssScore >= 7.0 ? 'border-red-500/30 bg-red-500/10 text-red-500' : vulnerability.cvssScore >= 4.0 ? 'border-orange-500/30 bg-orange-500/10 text-orange-500' : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-500'} relative group cursor-help`}
+                            title="Common Vulnerability Scoring System"
+                          >
+                            {vulnerability.cvssScore.toFixed(1)}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-1 w-40 bg-white dark:bg-zinc-800 shadow-lg rounded-md p-2 text-xs text-left text-zinc-700 dark:text-zinc-300 invisible group-hover:visible z-10 border border-zinc-200 dark:border-zinc-700">
+                              <div className="font-semibold mb-1 text-zinc-900 dark:text-zinc-100">CVSS Score: {vulnerability.cvssScore.toFixed(1)}</div>
+                              <div>
+                                <span className="font-medium">Risk: </span> 
+                                {getCvssRiskLevel(vulnerability.cvssScore)}
+                              </div>
+                              <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">
+                                Common Vulnerability Scoring System measures the severity of vulnerabilities
+                              </div>
+                            </div>
+                          </span>
                         )}
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          expandedVulnerability === actualIndex 
+                            ? 'bg-indigo-500/10 text-indigo-500' 
+                            : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
+                        } transition-colors duration-200`}>
+                          {expandedVulnerability === actualIndex ? (
+                            <IconChevronUp className="w-4 h-4" />
+                          ) : (
+                            <IconChevronDown className="w-4 h-4" />
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  {expandedVulnerability === index && (
-                    <div className="bg-white dark:bg-zinc-900 p-4 text-zinc-800 dark:text-zinc-100 border-t border-zinc-200 dark:border-zinc-800">
-                      <div className="space-y-4">
-                        <div>
-                          <div className="flex items-center text-sm mb-2">
-                            <IconAlertCircle className={`w-4 h-4 mr-2 ${colors.icon}`} />
-                            <span className={colors.title}>Description</span>
-                          </div>
-                          <p className={`ml-6 ${colors.text}`}>
-                            {vulnerability.description}
-                          </p>
-                        </div>
-                        
-                        {vulnerability.cvssScore && (
+                    
+                    {expandedVulnerability === actualIndex && (
+                      <div className="bg-white dark:bg-zinc-900 p-4 text-zinc-800 dark:text-zinc-100 border-t border-zinc-200 dark:border-zinc-800">
+                        <div className="space-y-4">
                           <div>
                             <div className="flex items-center text-sm mb-2">
-                              <IconInfoCircle className={`w-4 h-4 mr-2 ${colors.icon}`} />
-                              <span className={colors.title}>CVSS Score</span>
+                              <IconAlertCircle className={`w-4 h-4 mr-2 ${colors.icon}`} />
+                              <span className={colors.title}>Description</span>
                             </div>
-                            <div className="ml-6 flex flex-col space-y-2">
-                              <div className="flex items-center">
-                                <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-2.5 mr-2">
-                                  <div 
-                                    className="h-2.5 rounded-full" 
-                                    style={{
-                                      width: `${vulnerability.cvssScore * 10}%`,
-                                      background: `linear-gradient(90deg, ${
-                                        vulnerability.cvssScore >= 7.0 ? '#ef4444' : 
-                                        vulnerability.cvssScore >= 4.0 ? '#f97316' : '#eab308'
-                                      } 0%, ${
-                                        vulnerability.cvssScore >= 7.0 ? '#dc2626' : 
-                                        vulnerability.cvssScore >= 4.0 ? '#ea580c' : '#ca8a04'
-                                      } 100%)`
-                                    }}
-                                  />
-                                </div>
-                                <span className={`text-sm font-semibold ${getCvssScoreColor(vulnerability.cvssScore)}`}>
-                                  {vulnerability.cvssScore.toFixed(1)}
-                                </span>
-                                <span className="text-xs ml-1.5 text-zinc-500 dark:text-zinc-400">
-                                  ({getCvssRiskLevel(vulnerability.cvssScore)})
-                                </span>
+                            <p className={`ml-6 ${colors.text}`}>
+                              {vulnerability.description}
+                            </p>
+                          </div>
+                          
+                          {vulnerability.cvssScore && (
+                            <div>
+                              <div className="flex items-center text-sm mb-2">
+                                <IconInfoCircle className={`w-4 h-4 mr-2 ${colors.icon}`} />
+                                <span className={colors.title}>CVSS Score</span>
                               </div>
-                              {vulnerability.cvssVector && (
-                                <div className="text-xs text-zinc-600 dark:text-zinc-400">
-                                  {formatCvssVector(vulnerability.cvssVector)}
-                                  <div className="mt-2 p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-md text-[10px] border border-zinc-200 dark:border-zinc-700/50">
-                                    <div className="font-medium text-zinc-700 dark:text-zinc-300 mb-1">Vector Explanation:</div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                                      {vulnerability.cvssVector.split('/').slice(1).map((metric, idx) => {
-                                        const [key, value] = metric.split(':');
-                                        let explanation = '';
-                                        
-                                        // Base metric explanations
-                                        switch(key) {
-                                          case 'AV': // Attack Vector
-                                            explanation = {
-                                              'N': 'Network - Remotely exploitable',
-                                              'A': 'Adjacent - Exploitable from adjacent network',
-                                              'L': 'Local - Requires local access',
-                                              'P': 'Physical - Requires physical access'
-                                            }[value] || '';
-                                            break;
-                                          case 'AC': // Attack Complexity
-                                            explanation = {
-                                              'L': 'Low - Easily exploitable',
-                                              'H': 'High - Requires specialized conditions'
-                                            }[value] || '';
-                                            break;
-                                          case 'PR': // Privileges Required
-                                            explanation = {
-                                              'N': 'None - No privileges needed',
-                                              'L': 'Low - Basic privileges required',
-                                              'H': 'High - Administrative privileges required'
-                                            }[value] || '';
-                                            break;
-                                          case 'UI': // User Interaction
-                                            explanation = {
-                                              'N': 'None - No user interaction required',
-                                              'R': 'Required - User interaction needed'
-                                            }[value] || '';
-                                            break;
-                                          case 'S': // Scope
-                                            explanation = {
-                                              'U': 'Unchanged - Affects only the vulnerable component',
-                                              'C': 'Changed - Can affect resources beyond the vulnerable component'
-                                            }[value] || '';
-                                            break;
-                                          case 'C': // Confidentiality
-                                            explanation = {
-                                              'N': 'None - No impact on confidentiality',
-                                              'L': 'Low - Limited information disclosure',
-                                              'H': 'High - Total information disclosure'
-                                            }[value] || '';
-                                            break;
-                                          case 'I': // Integrity
-                                            explanation = {
-                                              'N': 'None - No impact on integrity',
-                                              'L': 'Low - Limited modification possible',
-                                              'H': 'High - Complete system compromise'
-                                            }[value] || '';
-                                            break;
-                                          case 'A': // Availability
-                                            explanation = {
-                                              'N': 'None - No impact on availability',
-                                              'L': 'Low - Reduced performance',
-                                              'H': 'High - Complete resource unavailability'
-                                            }[value] || '';
-                                            break;
-                                        }
-                                        
-                                        if (!explanation) return null;
-                                        
-                                        return (
-                                          <div key={idx} className="flex">
-                                            <span className="font-mono font-medium">{metric}</span>
-                                            <span className="mx-1">-</span>
-                                            <span>{explanation}</span>
-                                          </div>
-                                        );
-                                      }).filter(Boolean)}
+                              <div className="ml-6 flex flex-col space-y-2">
+                                <div className="flex items-center">
+                                  <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-2.5 mr-2">
+                                    <div 
+                                      className="h-2.5 rounded-full" 
+                                      style={{
+                                        width: `${vulnerability.cvssScore * 10}%`,
+                                        background: `linear-gradient(90deg, ${
+                                          vulnerability.cvssScore >= 7.0 ? '#ef4444' : 
+                                          vulnerability.cvssScore >= 4.0 ? '#f97316' : '#eab308'
+                                        } 0%, ${
+                                          vulnerability.cvssScore >= 7.0 ? '#dc2626' : 
+                                          vulnerability.cvssScore >= 4.0 ? '#ea580c' : '#ca8a04'
+                                        } 100%)`
+                                      }}
+                                    />
+                                  </div>
+                                  <span className={`text-sm font-semibold ${getCvssScoreColor(vulnerability.cvssScore)}`}>
+                                    {vulnerability.cvssScore.toFixed(1)}
+                                  </span>
+                                  <span className="text-xs ml-1.5 text-zinc-500 dark:text-zinc-400">
+                                    ({getCvssRiskLevel(vulnerability.cvssScore)})
+                                  </span>
+                                </div>
+                                {vulnerability.cvssVector && (
+                                  <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                                    {formatCvssVector(vulnerability.cvssVector)}
+                                    <div className="mt-2 p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-md text-[10px] border border-zinc-200 dark:border-zinc-700/50">
+                                      <div className="font-medium text-zinc-700 dark:text-zinc-300 mb-1">Vector Explanation:</div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                        {vulnerability.cvssVector.split('/').slice(1).map((metric, idx) => {
+                                          const [key, value] = metric.split(':');
+                                          let explanation = '';
+                                          
+                                          // Base metric explanations
+                                          switch(key) {
+                                            case 'AV': // Attack Vector
+                                              explanation = {
+                                                'N': 'Network - Remotely exploitable',
+                                                'A': 'Adjacent - Exploitable from adjacent network',
+                                                'L': 'Local - Requires local access',
+                                                'P': 'Physical - Requires physical access'
+                                              }[value] || '';
+                                              break;
+                                            case 'AC': // Attack Complexity
+                                              explanation = {
+                                                'L': 'Low - Easily exploitable',
+                                                'H': 'High - Requires specialized conditions'
+                                              }[value] || '';
+                                              break;
+                                            case 'PR': // Privileges Required
+                                              explanation = {
+                                                'N': 'None - No privileges needed',
+                                                'L': 'Low - Basic privileges required',
+                                                'H': 'High - Administrative privileges required'
+                                              }[value] || '';
+                                              break;
+                                            case 'UI': // User Interaction
+                                              explanation = {
+                                                'N': 'None - No user interaction required',
+                                                'R': 'Required - User interaction needed'
+                                              }[value] || '';
+                                              break;
+                                            case 'S': // Scope
+                                              explanation = {
+                                                'U': 'Unchanged - Affects only the vulnerable component',
+                                                'C': 'Changed - Can affect resources beyond the vulnerable component'
+                                              }[value] || '';
+                                              break;
+                                            case 'C': // Confidentiality
+                                              explanation = {
+                                                'N': 'None - No impact on confidentiality',
+                                                'L': 'Low - Limited information disclosure',
+                                                'H': 'High - Total information disclosure'
+                                              }[value] || '';
+                                              break;
+                                            case 'I': // Integrity
+                                              explanation = {
+                                                'N': 'None - No impact on integrity',
+                                                'L': 'Low - Limited modification possible',
+                                                'H': 'High - Complete system compromise'
+                                              }[value] || '';
+                                              break;
+                                            case 'A': // Availability
+                                              explanation = {
+                                                'N': 'None - No impact on availability',
+                                                'L': 'Low - Reduced performance',
+                                                'H': 'High - Complete resource unavailability'
+                                              }[value] || '';
+                                              break;
+                                          }
+                                          
+                                          if (!explanation) return null;
+                                          
+                                          return (
+                                            <div key={idx} className="flex">
+                                              <span className="font-mono font-medium">{metric}</span>
+                                              <span className="mx-1">-</span>
+                                              <span>{explanation}</span>
+                                            </div>
+                                          );
+                                        }).filter(Boolean)}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {vulnerability.location && (
-                          <div>
-                            <div className="flex items-center text-sm mb-2">
-                              <IconMapPin className={`w-4 h-4 mr-2 ${colors.icon}`} />
-                              <span className={colors.title}>Location</span>
-                            </div>
-                            <div 
-                              className={`ml-6 px-3 py-2 rounded group cursor-pointer ${colors.highlight} border border-zinc-200 dark:border-zinc-700/50 font-mono text-xs text-zinc-800 dark:text-zinc-200 flex items-center space-x-1 hover:shadow-md transition-shadow`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (lineNumber) scrollToLine(lineNumber);
-                              }}
-                              title={lineNumber ? `Click to highlight line ${lineNumber} in the code editor` : ''}
-                            >
-                              <IconCode size={14} className={`${colors.icon} flex-shrink-0`} />
-                              <div className="flex-1">
-                                {lineNumber ? (
-                                  <>
-                                    <span>
-                                      {vulnerability.location.split('Line ')[0]}Line 
-                                    </span>
-                                    <span className="font-bold underline decoration-dotted underline-offset-2">
-                                      {lineNumber}
-                                    </span>
-                                    <span>
-                                      {vulnerability.location.split(`Line ${lineNumber}`)[1]}
-                                    </span>
-                                  </>
-                                ) : (
-                                  vulnerability.location
                                 )}
                               </div>
                             </div>
-                          </div>
-                        )}
-                        
-                        {vulnerability.solution && (
-                          <div>
-                            <div className="flex items-center text-sm mb-2">
-                              <IconTools className="w-4 h-4 mr-2 text-emerald-500" />
-                              <span className="text-emerald-800 dark:text-emerald-300 font-medium">Solution</span>
+                          )}
+                          
+                          {vulnerability.location && (
+                            <div>
+                              <div className="flex items-center text-sm mb-2">
+                                <IconMapPin className={`w-4 h-4 mr-2 ${colors.icon}`} />
+                                <span className={colors.title}>Location</span>
+                              </div>
+                              <div 
+                                className={`ml-6 px-3 py-2 rounded group cursor-pointer ${colors.highlight} border border-zinc-200 dark:border-zinc-700/50 font-mono text-xs text-zinc-800 dark:text-zinc-200 flex items-center space-x-1 hover:shadow-md transition-shadow`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (lineNumber) scrollToLine(lineNumber);
+                                }}
+                                title={lineNumber ? `Click to highlight line ${lineNumber} in the code editor` : ''}
+                              >
+                                <IconCode size={14} className={`${colors.icon} flex-shrink-0`} />
+                                <div className="flex-1">
+                                  {lineNumber ? (
+                                    <>
+                                      <span>
+                                        {vulnerability.location.split('Line ')[0]}Line 
+                                      </span>
+                                      <span className="font-bold underline decoration-dotted underline-offset-2">
+                                        {lineNumber}
+                                      </span>
+                                      <span>
+                                        {vulnerability.location.split(`Line ${lineNumber}`)[1]}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    vulnerability.location
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <p className="ml-6 text-emerald-600/80 dark:text-emerald-400/90">
-                              {vulnerability.solution}
-                            </p>
-                          </div>
-                        )}
+                          )}
+                          
+                          {vulnerability.solution && (
+                            <div>
+                              <div className="flex items-center text-sm mb-2">
+                                <IconTools className="w-4 h-4 mr-2 text-emerald-500" />
+                                <span className="text-emerald-800 dark:text-emerald-300 font-medium">Solution</span>
+                              </div>
+                              <p className="ml-6 text-emerald-600/80 dark:text-emerald-400/90">
+                                {vulnerability.solution}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <IconAlertTriangle className="w-8 h-8 mx-auto text-zinc-400 dark:text-zinc-500 mb-2" />
+                <p className="text-zinc-600 dark:text-zinc-400 text-sm">
+                  {vulnerabilities.length > 0 
+                    ? 'No vulnerabilities match the current filters.' 
+                    : 'No vulnerabilities were found in this code.'}
+                </p>
+                {vulnerabilities.length > 0 && (
+                  <button 
+                    onClick={() => setSeverityFilter(['high', 'medium', 'low'])}
+                    className="mt-3 px-3 py-1.5 text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-800/40 transition-colors"
+                  >
+                    Reset Filters
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-6 bg-zinc-50 dark:bg-zinc-900 rounded-lg p-2 shadow-sm">
+              <div className="flex items-center mb-2 sm:mb-0">
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 mr-2">Items per page:</span>
+                <select 
+                  value={itemsPerPage} 
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1); // Reset to first page
+                  }}
+                  className="text-xs rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 px-1.5 py-1"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+              
+              <nav className="flex items-center space-x-1">
+                <button 
+                  onClick={() => paginate(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-2 py-1 rounded text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(number => (
+                  <button
+                    key={number}
+                    onClick={() => paginate(number)}
+                    className={`w-7 h-7 flex items-center justify-center rounded text-xs ${
+                      currentPage === number
+                        ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-medium'
+                        : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300'
+                    }`}
+                  >
+                    {number}
+                  </button>
+                ))}
+                
+                <button
+                  onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-2 py-1 rounded text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </nav>
+            </div>
+          )}
         </div>
       )}
 
