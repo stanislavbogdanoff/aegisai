@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { generateSecureCode, type Vulnerability, type SecureCodeResponse, type CodeDiff } from '@/app/actions'
-import { IconLoader2, IconAlertTriangle, IconChevronDown, IconChevronUp, IconAlertCircle, IconCode, IconTerminal2, IconCopy, IconCheck, IconShield, IconBug, IconMapPin, IconTools, IconExchange, IconColumns, IconMaximize, IconMinimize, IconX, IconInfoCircle, IconFileDownload, IconPrinter, IconFile } from '@tabler/icons-react'
+import { generateSecureCode, type Vulnerability, type SecureCodeResponse, type CodeDiff, type CodeQualityRecommendation } from '@/app/actions'
+import { IconLoader2, IconAlertTriangle, IconChevronDown, IconChevronUp, IconAlertCircle, IconCode, IconTerminal2, IconCopy, IconCheck, IconShield, IconBug, IconMapPin, IconTools, IconExchange, IconColumns, IconMaximize, IconMinimize, IconX, IconInfoCircle, IconFileDownload, IconPrinter, IconFile, IconRefresh, IconBrush, IconArrowRight } from '@tabler/icons-react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
@@ -33,102 +33,32 @@ const SAMPLE_RESPONSE: SecureCodeResponse = {
       cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
       location: "Line 2 where input is used directly",
       solution: "Added input sanitization using DOMPurify before processing user input."
+    }
+  ],
+  qualityRecommendations: [
+    {
+      description: "Function lacks error handling for database operations which could lead to unhandled exceptions",
+      category: "best-practice",
+      priority: "high",
+      location: "Line 5-6 in function processUserInput()",
+      suggestion: "Add try/catch block around database operations to handle potential errors",
+      impact: "Improves application stability and prevents crashes from database errors"
     },
     {
-      description: "Insecure Direct Object Reference (IDOR) vulnerability allows attackers to access unauthorized resources by manipulating reference parameters.",
-      severity: "high",
-      cvssScore: 7.5,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N",
-      location: "Line 5 in function getUserData()",
-      solution: "Implemented proper authorization checks before accessing user data."
+      description: "Missing input validation beyond sanitization",
+      category: "maintainability",
+      priority: "medium",
+      location: "Line 2 in function processUserInput()",
+      suggestion: "Add input validation to check for expected format/values before processing",
+      impact: "Reduces edge cases and makes code more robust against unexpected inputs"
     },
     {
-      description: "Path Traversal vulnerability allows attackers to access files and directories outside of the intended directory through manipulating file paths.",
-      severity: "high",
-      cvssScore: 7.7,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:N",
-      location: "Line 12 in fileDownload function",
-      solution: "Used path normalization and validation to prevent directory traversal."
-    },
-    {
-      description: "Insecure cryptographic storage due to the use of an outdated and weak hashing algorithm (MD5) for password storage.",
-      severity: "medium",
-      cvssScore: 6.5,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
-      location: "Line 23 in hashPassword function",
-      solution: "Replaced MD5 with bcrypt, a strong adaptive hashing function designed specifically for password hashing."
-    },
-    {
-      description: "Open Redirect vulnerability allows attackers to redirect users to malicious websites by manipulating the redirect URL parameter.",
-      severity: "medium",
-      cvssScore: 5.4,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
-      location: "Line 38 in redirect function",
-      solution: "Implemented URL validation and whitelist of allowed domains for redirects."
-    },
-    {
-      description: "XML External Entity (XXE) vulnerability allows attackers to read sensitive files or perform server side request forgery by injecting malicious XML.",
-      severity: "high",
-      cvssScore: 8.2,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:L",
-      location: "Line 45 in processXML function",
-      solution: "Disabled external entity processing in the XML parser configuration."
-    },
-    {
-      description: "Hardcoded credentials in the source code expose sensitive authentication information that could lead to unauthorized access.",
-      severity: "high",
-      cvssScore: 9.1,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
-      location: "Line 57 - Database connection string",
-      solution: "Moved credentials to environment variables and implemented secure configuration management."
-    },
-    {
-      description: "Insecure random number generation using Math.random() which is not cryptographically secure and can be predicted.",
-      severity: "low",
-      cvssScore: 3.7,
-      cvssVector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N",
-      location: "Line 72 in generateToken function",
-      solution: "Used the crypto.getRandomValues() API for cryptographically secure random values."
-    },
-    {
-      description: "Missing rate limiting could allow brute force attacks against authentication endpoints.",
-      severity: "medium",
-      cvssScore: 5.3,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N",
-      location: "Line 89 in login function",
-      solution: "Implemented rate limiting and account lockout mechanisms after multiple failed attempts."
-    },
-    {
-      description: "Improper certificate validation bypasses TLS security by accepting any certificate without verification.",
-      severity: "high",
-      cvssScore: 8.1,
-      cvssVector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H",
-      location: "Line 103 in HTTP client configuration",
-      solution: "Enabled proper certificate validation in the HTTP client."
-    },
-    {
-      description: "Sensitive data exposure through detailed error messages that reveal implementation details and stack traces.",
-      severity: "low",
-      cvssScore: 3.5,
-      cvssVector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N",
-      location: "Line 134 in error handling",
-      solution: "Implemented generic error messages for production and proper logging for debugging."
-    },
-    {
-      description: "Cross-Site Request Forgery (CSRF) vulnerability allows attackers to perform actions on behalf of authenticated users who visit a malicious website.",
-      severity: "medium",
-      cvssScore: 6.4,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:H/A:N",
-      location: "Line 149 in form handling",
-      solution: "Implemented anti-CSRF tokens for all sensitive operations."
-    },
-    {
-      description: "Missing Content Security Policy (CSP) header increases risk of XSS and other client-side attacks.",
-      severity: "low",
-      cvssScore: 3.9,
-      cvssVector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:L/A:N",
-      location: "Line 167 in HTTP response headers",
-      solution: "Added a strict Content Security Policy header to restrict resource loading."
+      description: "Function has no comments explaining its purpose or parameters",
+      category: "style",
+      priority: "low",
+      location: "Line 1 in function processUserInput()",
+      suggestion: "Add JSDoc style comments to document function purpose, parameters and return value",
+      impact: "Improves code readability and maintainability for other developers"
     }
   ],
   diff: [
@@ -215,6 +145,12 @@ export default function AegisChatBot() {
   // New state for PDF export
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const reportRef = useRef<HTMLDivElement>(null)
+  
+  // New state for code quality recommendations
+  const [qualityRecommendations, setQualityRecommendations] = useState<CodeQualityRecommendation[]>([])
+  const [expandedRecommendation, setExpandedRecommendation] = useState<number | null>(null)
+  const [qualityFilter, setQualityFilter] = useState<string[]>(['performance', 'maintainability', 'best-practice', 'style'])
+  const [qualityPriorityFilter, setQualityPriorityFilter] = useState<string[]>(['high', 'medium', 'low'])
   
   // Refs for synchronized scrolling
   const leftPanelRef = useRef<HTMLDivElement>(null);
@@ -323,11 +259,23 @@ export default function AegisChatBot() {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(10);
       pdf.setTextColor(107, 114, 128); // Gray
+      
+      // Count quality recommendations by category
+      const perfRecs = qualityRecommendations.filter(r => r.category === 'performance').length;
+      const maintRecs = qualityRecommendations.filter(r => r.category === 'maintainability').length;
+      const bestPracRecs = qualityRecommendations.filter(r => r.category === 'best-practice').length;
+      const styleRecs = qualityRecommendations.filter(r => r.category === 'style').length;
+      
       pdf.text(`Total vulnerabilities found: ${vulnerabilities.length}`, 30, 205);
       pdf.text(`Security issues by severity: ${highSeverity} high, ${mediumSeverity} medium, ${lowSeverity} low`, 30, 215);
+      pdf.text(`Code quality recommendations: ${qualityRecommendations.length}`, 30, 225);
+      
+      if (qualityRecommendations.length > 0) {
+        pdf.text(`Quality issues by category: ${perfRecs} performance, ${maintRecs} maintainability, ${bestPracRecs} best practice, ${styleRecs} style`, 30, 235);
+      }
       
       if (diff && diff.length > 0) {
-        pdf.text(`Code modifications: ${diff.filter(d => d.changeType !== 'unchanged').length} lines changed`, 30, 225);
+        pdf.text(`Code modifications: ${diff.filter(d => d.changeType !== 'unchanged').length} lines changed`, 30, 245);
       }
       
       // Add footer to cover page
@@ -951,6 +899,16 @@ export default function AegisChatBot() {
     try {
       setIsLoading(true)
       
+      // Validate input
+      if (!prompt || prompt.trim() === '') {
+        setSecureCode('⚠️ Please enter some code to analyze.');
+        setVulnerabilities([]);
+        setQualityRecommendations([]);
+        setDiff([]);
+        setIsLoading(false);
+        return;
+      }
+      
       let result: SecureCodeResponse;
       
       if (useSampleData) {
@@ -959,19 +917,35 @@ export default function AegisChatBot() {
         result = SAMPLE_RESPONSE;
       } else {
         // Make the actual API call
+        console.log('Sending code for analysis...', prompt.substring(0, 100) + '...');
         result = await generateSecureCode(prompt);
         // Log the full response to console for later reuse
         console.log('API Response:');
         console.log(JSON.stringify(result, null, 2));
       }
       
-      setSecureCode(result.secureCode)
-      setVulnerabilities(result.vulnerabilities)
-      setDiff(result.diff || [])
+      // Check if we received an error message
+      if (result.secureCode.startsWith('⚠️')) {
+        // Show error message in the UI
+        setSecureCode(result.secureCode);
+        setVulnerabilities([]);
+        setQualityRecommendations([]);
+        setDiff([]);
+      } else {
+        // Normal processing
+        setSecureCode(result.secureCode);
+        setVulnerabilities(result.vulnerabilities);
+        setQualityRecommendations(result.qualityRecommendations || []);
+        setDiff(result.diff || []);
+      }
     } catch (error) {
-      console.error('Error generating secure code:', error)
+      console.error('Error generating secure code:', error);
+      setSecureCode('⚠️ An unexpected error occurred. Please try again.');
+      setVulnerabilities([]);
+      setQualityRecommendations([]);
+      setDiff([]);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -1245,9 +1219,109 @@ export default function AegisChatBot() {
     setCurrentPage(1);
   };
 
+  // Get category color for code quality recommendations
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'performance':
+        return {
+          bg: 'bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-blue-500/10',
+          border: 'border-blue-500/20',
+          text: 'text-zinc-600 dark:text-zinc-400',
+          icon: 'text-blue-500',
+          badge: 'bg-blue-500/10 border-blue-500/30 text-blue-500',
+          title: 'text-blue-800 dark:text-blue-300 font-medium',
+          highlight: 'bg-blue-50 dark:bg-blue-500/10'
+        }
+      case 'maintainability':
+        return {
+          bg: 'bg-gradient-to-r from-purple-500/10 via-purple-500/5 to-purple-500/10',
+          border: 'border-purple-500/20',
+          text: 'text-zinc-600 dark:text-zinc-400',
+          icon: 'text-purple-500',
+          badge: 'bg-purple-500/10 border-purple-500/30 text-purple-500',
+          title: 'text-purple-800 dark:text-purple-300 font-medium',
+          highlight: 'bg-purple-50 dark:bg-purple-500/10'
+        }
+      case 'best-practice':
+        return {
+          bg: 'bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-emerald-500/10',
+          border: 'border-emerald-500/20',
+          text: 'text-zinc-600 dark:text-zinc-400',
+          icon: 'text-emerald-500',
+          badge: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500',
+          title: 'text-emerald-800 dark:text-emerald-300 font-medium',
+          highlight: 'bg-emerald-50 dark:bg-emerald-500/10'
+        }
+      case 'style':
+        return {
+          bg: 'bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10',
+          border: 'border-amber-500/20',
+          text: 'text-zinc-600 dark:text-zinc-400',
+          icon: 'text-amber-500',
+          badge: 'bg-amber-500/10 border-amber-500/30 text-amber-500',
+          title: 'text-amber-800 dark:text-amber-300 font-medium',
+          highlight: 'bg-amber-50 dark:bg-amber-500/10'
+        }
+      default:
+        return {
+          bg: 'bg-gradient-to-r from-zinc-500/10 via-zinc-500/5 to-zinc-500/10',
+          border: 'border-zinc-500/20',
+          text: 'text-zinc-600 dark:text-zinc-400',
+          icon: 'text-zinc-500',
+          badge: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-500',
+          title: 'text-zinc-800 dark:text-zinc-300 font-medium',
+          highlight: 'bg-zinc-50 dark:bg-zinc-500/10'
+        }
+    }
+  }
+
+  // Helper function to get priority color
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return 'text-red-500 border-red-500/30 bg-red-500/10';
+      case 'medium':
+        return 'text-orange-500 border-orange-500/30 bg-orange-500/10';
+      case 'low':
+        return 'text-yellow-500 border-yellow-500/30 bg-yellow-500/10';
+      default:
+        return 'text-zinc-500 border-zinc-500/30 bg-zinc-500/10';
+    }
+  }
+
+  // Toggle recommendation expansion
+  const toggleRecommendation = (index: number) => {
+    if (expandedRecommendation === index) {
+      setExpandedRecommendation(null)
+    } else {
+      setExpandedRecommendation(index)
+    }
+  }
+
+  // Helper functions for quality recommendations filtering and sorting
+  const filterQualityRecommendations = (recs: CodeQualityRecommendation[]) => {
+    return recs.filter(r => 
+      qualityFilter.includes(r.category) && 
+      qualityPriorityFilter.includes(r.priority)
+    );
+  };
+
+  // Toggle quality category filter
+  const toggleQualityFilter = (category: string) => {
+    if (qualityFilter.includes(category)) {
+      // If removing the last filter, don't allow it
+      if (qualityFilter.length === 1) return;
+      setQualityFilter(qualityFilter.filter(c => c !== category));
+    } else {
+      setQualityFilter([...qualityFilter, category]);
+    }
+    // Reset to first page when filter changes
+    setCurrentPage(1);
+  };
+
   return (
     <div className="max-w-6xl w-full mx-auto relative z-10 flex items-center space-x-4 rounded-sm flex-col bg-zinc-950/50 p-10 ring-1 ring-white/10 backdrop-blur-md">
-      <h2 className="text-2xl font-medium text-zinc-800 dark:text-zinc-100 mb-6">
+      <h2 className="text-2xl font-medium text-zinc-800 dark:text-zinc-100 mb-6 font-heading">
         AegisAI – Secure Code Generator
       </h2>
 
@@ -1730,6 +1804,221 @@ export default function AegisChatBot() {
               </nav>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Code Quality Recommendations Section */}
+      {qualityRecommendations.length > 0 && (
+        <div className="w-full mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-zinc-800 dark:text-zinc-100 flex items-center">
+              <IconTools className="w-5 h-5 mr-2 text-indigo-500" />
+              Code Quality Recommendations
+            </h3>
+            <div className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium">
+              {filterQualityRecommendations(qualityRecommendations).length} of {qualityRecommendations.length} {qualityRecommendations.length === 1 ? 'recommendation' : 'recommendations'}
+            </div>
+          </div>
+          
+          {/* Quality recommendation filters */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4 items-start sm:items-center flex-wrap">
+            <div className="flex flex-wrap gap-2">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400 self-center">Category:</span>
+              <button
+                onClick={() => toggleQualityFilter('performance')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  qualityFilter.includes('performance')
+                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${qualityFilter.includes('performance') ? 'bg-blue-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                Performance
+              </button>
+              <button
+                onClick={() => toggleQualityFilter('maintainability')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  qualityFilter.includes('maintainability')
+                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${qualityFilter.includes('maintainability') ? 'bg-purple-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                Maintainability
+              </button>
+              <button
+                onClick={() => toggleQualityFilter('best-practice')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  qualityFilter.includes('best-practice')
+                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${qualityFilter.includes('best-practice') ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                Best Practice
+              </button>
+              <button
+                onClick={() => toggleQualityFilter('style')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  qualityFilter.includes('style')
+                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${qualityFilter.includes('style') ? 'bg-amber-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                Style
+              </button>
+            </div>
+          </div>
+          
+          {/* Display quality recommendations */}
+          <div className="space-y-4">
+            {filterQualityRecommendations(qualityRecommendations).length > 0 ? (
+              filterQualityRecommendations(qualityRecommendations).map((recommendation, index) => {
+                const colors = getCategoryColor(recommendation.category);
+                const lineNumberMatch = recommendation.location && recommendation.location.match(/Line (\d+)/i);
+                const lineNumber = lineNumberMatch ? parseInt(lineNumberMatch[1]) : null;
+                
+                return (
+                  <div 
+                    key={index}
+                    className={`rounded-xl overflow-hidden shadow-md transition-all duration-200 ${
+                      expandedRecommendation === index 
+                        ? 'ring-1 ring-zinc-300/20 dark:ring-zinc-700/30' 
+                        : 'hover:shadow-lg'
+                    }`}
+                  >
+                    <div 
+                      className={`px-4 py-3 flex justify-between items-center cursor-pointer ${colors.bg} ${colors.border} border-b transition-colors duration-200`}
+                      onClick={() => toggleRecommendation(index)}
+                    >
+                      <div className="flex items-center">
+                        {recommendation.category === 'performance' && <IconMaximize className={`w-5 h-5 mr-3 ${colors.icon}`} />}
+                        {recommendation.category === 'maintainability' && <IconRefresh className={`w-5 h-5 mr-3 ${colors.icon}`} />}
+                        {recommendation.category === 'best-practice' && <IconCheck className={`w-5 h-5 mr-3 ${colors.icon}`} />}
+                        {recommendation.category === 'style' && <IconBrush className={`w-5 h-5 mr-3 ${colors.icon}`} />}
+                        <span className={`font-medium text-zinc-900 dark:text-zinc-50`}>
+                          {recommendation.description.split('.')[0]}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className={`text-xs capitalize font-semibold px-2.5 py-0.5 rounded-full border ${colors.badge}`}>
+                          {recommendation.category.replace('-', ' ')}
+                        </span>
+                        <span className={`text-xs uppercase px-2 py-0.5 rounded-full border ${getPriorityColor(recommendation.priority)}`}>
+                          {recommendation.priority}
+                        </span>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          expandedRecommendation === index 
+                            ? 'bg-indigo-500/10 text-indigo-500' 
+                            : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
+                        } transition-colors duration-200`}>
+                          {expandedRecommendation === index ? (
+                            <IconChevronUp className="w-4 h-4" />
+                          ) : (
+                            <IconChevronDown className="w-4 h-4" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {expandedRecommendation === index && (
+                      <div className="bg-white dark:bg-zinc-900 p-4 text-zinc-800 dark:text-zinc-100 border-t border-zinc-200 dark:border-zinc-800">
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex items-center text-sm mb-2">
+                              <IconInfoCircle className={`w-4 h-4 mr-2 ${colors.icon}`} />
+                              <span className={colors.title}>Description</span>
+                            </div>
+                            <p className={`ml-6 ${colors.text}`}>
+                              {recommendation.description}
+                            </p>
+                          </div>
+                          
+                          {recommendation.location && (
+                            <div>
+                              <div className="flex items-center text-sm mb-2">
+                                <IconMapPin className={`w-4 h-4 mr-2 ${colors.icon}`} />
+                                <span className={colors.title}>Location</span>
+                              </div>
+                              <div 
+                                className={`ml-6 px-3 py-2 rounded group cursor-pointer ${colors.highlight} border border-zinc-200 dark:border-zinc-700/50 font-mono text-xs text-zinc-800 dark:text-zinc-200 flex items-center space-x-1 hover:shadow-md transition-shadow`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (lineNumber) scrollToLine(lineNumber);
+                                }}
+                                title={lineNumber ? `Click to highlight line ${lineNumber} in the code editor` : ''}
+                              >
+                                <IconCode size={14} className={`${colors.icon} flex-shrink-0`} />
+                                <div className="flex-1">
+                                  {lineNumber ? (
+                                    <>
+                                      <span>
+                                        {recommendation.location.split('Line ')[0]}Line 
+                                      </span>
+                                      <span className="font-bold underline decoration-dotted underline-offset-2">
+                                        {lineNumber}
+                                      </span>
+                                      <span>
+                                        {recommendation.location.split(`Line ${lineNumber}`)[1]}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    recommendation.location
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {recommendation.suggestion && (
+                            <div>
+                              <div className="flex items-center text-sm mb-2">
+                                <IconTools className={`w-4 h-4 mr-2 ${colors.icon}`} />
+                                <span className={colors.title}>Suggestion</span>
+                              </div>
+                              <p className={`ml-6 ${colors.text}`}>
+                                {recommendation.suggestion}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {recommendation.impact && (
+                            <div>
+                              <div className="flex items-center text-sm mb-2">
+                                <IconArrowRight className={`w-4 h-4 mr-2 ${colors.icon}`} />
+                                <span className={colors.title}>Impact</span>
+                              </div>
+                              <p className={`ml-6 ${colors.text}`}>
+                                {recommendation.impact}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <IconInfoCircle className="w-8 h-8 mx-auto text-zinc-400 dark:text-zinc-500 mb-2" />
+                <p className="text-zinc-600 dark:text-zinc-400 text-sm">
+                  {qualityRecommendations.length > 0 
+                    ? 'No quality recommendations match the current filters.' 
+                    : 'No code quality recommendations were found in this code.'}
+                </p>
+                {qualityRecommendations.length > 0 && (
+                  <button 
+                    onClick={() => setQualityFilter(['performance', 'maintainability', 'best-practice', 'style'])}
+                    className="mt-3 px-3 py-1.5 text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-800/40 transition-colors"
+                  >
+                    Reset Filters
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

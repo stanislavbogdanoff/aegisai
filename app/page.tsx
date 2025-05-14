@@ -20,7 +20,7 @@ export default function Home() {
       <div className="h-screen w-full flex items-center justify-center gap-[20px]">
         <HeroSection />
       </div>
-      <div className="h-screen w-full flex flex-col items-center justify-center">
+      <div className="h-screen w-full flex flex-col items-center justify-center mt-20 mb-20">
         <AIChatbot />
       </div>
       <div className="h-screen flex flex-col items-center justify-center gap-[20px]">
