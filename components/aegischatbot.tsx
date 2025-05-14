@@ -19,12 +19,16 @@ const SAMPLE_RESPONSE: SecureCodeResponse = {
     {
       description: "SQL Injection vulnerability in database query. The original code used string concatenation to build SQL queries which allows attackers to inject malicious SQL commands.",
       severity: "high",
+      cvssScore: 8.6,
+      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:N",
       location: "Line 4 in function processUserInput()",
       solution: "Used prepared statements with parameterized queries instead of concatenating strings."
     },
     {
       description: "Cross-Site Scripting (XSS) vulnerability due to unfiltered user input being processed. User input was not sanitized before use.",
       severity: "medium",
+      cvssScore: 6.1,
+      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
       location: "Line 2 where input is used directly",
       solution: "Added input sanitization using DOMPurify before processing user input."
     }
@@ -485,6 +489,59 @@ export default function AegisChatBot() {
     }
   }
 
+  // Helper function to get color based on CVSS score
+  const getCvssScoreColor = (score: number) => {
+    if (score >= 9.0) return 'text-red-600 dark:text-red-400 font-bold';
+    if (score >= 7.0) return 'text-red-500 dark:text-red-300';
+    if (score >= 4.0) return 'text-orange-500 dark:text-orange-300';
+    return 'text-yellow-500 dark:text-yellow-300';
+  }
+  
+  // Helper function to get risk level based on CVSS score
+  const getCvssRiskLevel = (score: number) => {
+    if (score >= 9.0) return 'Critical';
+    if (score >= 7.0) return 'High';
+    if (score >= 4.0) return 'Medium';
+    if (score >= 0.1) return 'Low';
+    return 'None';
+  }
+  
+  // Helper function to format CVSS vector for display
+  const formatCvssVector = (vector: string) => {
+    // Return the raw vector string if it doesn't follow expected format
+    if (!vector.startsWith('CVSS:')) return vector;
+    
+    // Extract the version and metrics
+    const parts = vector.split('/');
+    const version = parts[0].split(':')[1];
+    const metrics = parts.slice(1);
+    
+    return (
+      <div className="flex flex-wrap gap-1">
+        <span className="px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 text-[10px] font-mono">
+          v{version}
+        </span>
+        {metrics.map((metric, idx) => {
+          const [key, value] = metric.split(':');
+          let bg = 'bg-zinc-100 dark:bg-zinc-800';
+          let text = 'text-zinc-700 dark:text-zinc-300';
+          
+          // Highlight high-risk metrics
+          if ((key === 'C' || key === 'I' || key === 'A') && value === 'H') {
+            bg = 'bg-red-100 dark:bg-red-900/30';
+            text = 'text-red-800 dark:text-red-300';
+          }
+          
+          return (
+            <span key={idx} className={`px-1.5 py-0.5 rounded-md ${bg} ${text} text-[10px] font-mono`}>
+              {metric}
+            </span>
+          );
+        })}
+      </div>
+    );
+  }
+
   const getChangeTypeStyles = (changeType: string) => {
     switch (changeType) {
       case 'added':
@@ -689,6 +746,24 @@ export default function AegisChatBot() {
                       <span className={`text-xs uppercase font-semibold px-2.5 py-0.5 rounded-full border ${colors.badge}`}>
                         {vulnerability.severity}
                       </span>
+                      {vulnerability.cvssScore && (
+                        <span 
+                          className={`text-xs font-mono px-2 py-0.5 rounded-full border ${vulnerability.cvssScore >= 9.0 ? 'border-red-500/30 bg-red-500/10 text-red-500 font-bold' : vulnerability.cvssScore >= 7.0 ? 'border-red-500/30 bg-red-500/10 text-red-500' : vulnerability.cvssScore >= 4.0 ? 'border-orange-500/30 bg-orange-500/10 text-orange-500' : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-500'} relative group cursor-help`}
+                          title="Common Vulnerability Scoring System"
+                        >
+                          {vulnerability.cvssScore.toFixed(1)}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-1 w-40 bg-white dark:bg-zinc-800 shadow-lg rounded-md p-2 text-xs text-left text-zinc-700 dark:text-zinc-300 invisible group-hover:visible z-10 border border-zinc-200 dark:border-zinc-700">
+                            <div className="font-semibold mb-1 text-zinc-900 dark:text-zinc-100">CVSS Score: {vulnerability.cvssScore.toFixed(1)}</div>
+                            <div>
+                              <span className="font-medium">Risk: </span> 
+                              {getCvssRiskLevel(vulnerability.cvssScore)}
+                            </div>
+                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">
+                              Common Vulnerability Scoring System measures the severity of vulnerabilities
+                            </div>
+                          </div>
+                        </span>
+                      )}
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
                         expandedVulnerability === index 
                           ? 'bg-indigo-500/10 text-indigo-500' 
@@ -715,6 +790,122 @@ export default function AegisChatBot() {
                             {vulnerability.description}
                           </p>
                         </div>
+                        
+                        {vulnerability.cvssScore && (
+                          <div>
+                            <div className="flex items-center text-sm mb-2">
+                              <IconInfoCircle className={`w-4 h-4 mr-2 ${colors.icon}`} />
+                              <span className={colors.title}>CVSS Score</span>
+                            </div>
+                            <div className="ml-6 flex flex-col space-y-2">
+                              <div className="flex items-center">
+                                <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-2.5 mr-2">
+                                  <div 
+                                    className="h-2.5 rounded-full" 
+                                    style={{
+                                      width: `${vulnerability.cvssScore * 10}%`,
+                                      background: `linear-gradient(90deg, ${
+                                        vulnerability.cvssScore >= 7.0 ? '#ef4444' : 
+                                        vulnerability.cvssScore >= 4.0 ? '#f97316' : '#eab308'
+                                      } 0%, ${
+                                        vulnerability.cvssScore >= 7.0 ? '#dc2626' : 
+                                        vulnerability.cvssScore >= 4.0 ? '#ea580c' : '#ca8a04'
+                                      } 100%)`
+                                    }}
+                                  />
+                                </div>
+                                <span className={`text-sm font-semibold ${getCvssScoreColor(vulnerability.cvssScore)}`}>
+                                  {vulnerability.cvssScore.toFixed(1)}
+                                </span>
+                                <span className="text-xs ml-1.5 text-zinc-500 dark:text-zinc-400">
+                                  ({getCvssRiskLevel(vulnerability.cvssScore)})
+                                </span>
+                              </div>
+                              {vulnerability.cvssVector && (
+                                <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                                  {formatCvssVector(vulnerability.cvssVector)}
+                                  <div className="mt-2 p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-md text-[10px] border border-zinc-200 dark:border-zinc-700/50">
+                                    <div className="font-medium text-zinc-700 dark:text-zinc-300 mb-1">Vector Explanation:</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                      {vulnerability.cvssVector.split('/').slice(1).map((metric, idx) => {
+                                        const [key, value] = metric.split(':');
+                                        let explanation = '';
+                                        
+                                        // Base metric explanations
+                                        switch(key) {
+                                          case 'AV': // Attack Vector
+                                            explanation = {
+                                              'N': 'Network - Remotely exploitable',
+                                              'A': 'Adjacent - Exploitable from adjacent network',
+                                              'L': 'Local - Requires local access',
+                                              'P': 'Physical - Requires physical access'
+                                            }[value] || '';
+                                            break;
+                                          case 'AC': // Attack Complexity
+                                            explanation = {
+                                              'L': 'Low - Easily exploitable',
+                                              'H': 'High - Requires specialized conditions'
+                                            }[value] || '';
+                                            break;
+                                          case 'PR': // Privileges Required
+                                            explanation = {
+                                              'N': 'None - No privileges needed',
+                                              'L': 'Low - Basic privileges required',
+                                              'H': 'High - Administrative privileges required'
+                                            }[value] || '';
+                                            break;
+                                          case 'UI': // User Interaction
+                                            explanation = {
+                                              'N': 'None - No user interaction required',
+                                              'R': 'Required - User interaction needed'
+                                            }[value] || '';
+                                            break;
+                                          case 'S': // Scope
+                                            explanation = {
+                                              'U': 'Unchanged - Affects only the vulnerable component',
+                                              'C': 'Changed - Can affect resources beyond the vulnerable component'
+                                            }[value] || '';
+                                            break;
+                                          case 'C': // Confidentiality
+                                            explanation = {
+                                              'N': 'None - No impact on confidentiality',
+                                              'L': 'Low - Limited information disclosure',
+                                              'H': 'High - Total information disclosure'
+                                            }[value] || '';
+                                            break;
+                                          case 'I': // Integrity
+                                            explanation = {
+                                              'N': 'None - No impact on integrity',
+                                              'L': 'Low - Limited modification possible',
+                                              'H': 'High - Complete system compromise'
+                                            }[value] || '';
+                                            break;
+                                          case 'A': // Availability
+                                            explanation = {
+                                              'N': 'None - No impact on availability',
+                                              'L': 'Low - Reduced performance',
+                                              'H': 'High - Complete resource unavailability'
+                                            }[value] || '';
+                                            break;
+                                        }
+                                        
+                                        if (!explanation) return null;
+                                        
+                                        return (
+                                          <div key={idx} className="flex">
+                                            <span className="font-mono font-medium">{metric}</span>
+                                            <span className="mx-1">-</span>
+                                            <span>{explanation}</span>
+                                          </div>
+                                        );
+                                      }).filter(Boolean)}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                         
                         {vulnerability.location && (
                           <div>
@@ -748,11 +939,6 @@ export default function AegisChatBot() {
                                   vulnerability.location
                                 )}
                               </div>
-                              {lineNumber && (
-                                <div className="flex-shrink-0 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded text-xs font-medium hidden group-hover:block">
-                                  Jump to code
-                                </div>
-                              )}
                             </div>
                           </div>
                         )}

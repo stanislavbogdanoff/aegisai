@@ -12,6 +12,8 @@ export type Vulnerability = {
   severity: 'high' | 'medium' | 'low'
   location?: string
   solution?: string
+  cvssScore?: number
+  cvssVector?: string
 }
 
 export type CodeDiff = {
@@ -42,6 +44,8 @@ export async function generateSecureCode(prompt: string): Promise<SecureCodeResp
                c. For each vulnerability, explain:
                   - Description of the vulnerability
                   - Severity level (high/medium/low)
+                  - CVSS score (on a scale of 0.0-10.0) for precise severity rating
+                  - CVSS vector string (abbreviated format) for vulnerability categorization
                   - Where it occurs in the code (line numbers or function names)
                   - How your fix addresses the vulnerability
                d. Provide a line-by-line comparison (diff) between the original and secure code
@@ -58,6 +62,8 @@ export async function generateSecureCode(prompt: string): Promise<SecureCodeResp
                 {
                   "description": "detailed description of vulnerability",
                   "severity": "high/medium/low",
+                  "cvssScore": 8.5,
+                  "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
                   "location": "where it occurs",
                   "solution": "how it was fixed"
                 },
@@ -100,6 +106,15 @@ export async function generateSecureCode(prompt: string): Promise<SecureCodeResp
             8. For added lines, use the line number where they were inserted
             9. For removed lines, use the line number where they were in the original code
             10. Do NOT add comments to the code in either the secureCode or diff sections
+            
+            For CVSS scores:
+            1. Use CVSS v3.1 when possible
+            2. Provide the numerical score (0.0-10.0) based on the standard calculation
+            3. Provide the vector string in the compact format
+            4. Ensure scores align with the severity rating (high/medium/low)
+            5. For high severity: 7.0-10.0
+            6. For medium severity: 4.0-6.9
+            7. For low severity: 0.1-3.9
             `
     const userPrompt = `Please analyze and secure the following code:\n\n${prompt}`
 
