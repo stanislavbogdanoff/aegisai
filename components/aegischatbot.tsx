@@ -439,55 +439,100 @@ export default function AegisChatBot() {
         // Vulnerability title
         pdf.setFontSize(12);
         pdf.setTextColor(33, 33, 33);
-        pdf.text(vulnerability.description.split('.')[0], 20, yPos + 3);
-        yPos += 8;
+        // Get just the first sentence for the title and limit its width
+        const title = vulnerability.description.split('.')[0];
+        const maxTitleWidth = 170; // Maximum width in mm
+        const splitTitle = pdf.splitTextToSize(title, maxTitleWidth);
+        
+        // Check if we need more space for the title
+        if (splitTitle.length > 1) {
+          checkAndAddPage(splitTitle.length * 5 + 10); // Account for multi-line title + spacing
+        }
+        
+        pdf.text(splitTitle, 20, yPos + 3);
+        
+        // Calculate proper y-position after multi-line title
+        // Each line is approximately 5mm high for 12pt font
+        yPos += 8 + ((splitTitle.length - 1) * 5);
         
         // CVSS Score
         if (vulnerability.cvssScore) {
+          // Check if we need more space
+          checkAndAddPage(10);
+          
           pdf.setFontSize(10);
           pdf.setTextColor(60, 60, 60);
           pdf.text(`CVSS Score: ${vulnerability.cvssScore.toFixed(1)} (${getCvssRiskLevel(vulnerability.cvssScore)})`, 20, yPos);
-          yPos += 5;
+          yPos += 6; // Increased spacing
         }
         
         // Description
+        checkAndAddPage(10);
         pdf.setFontSize(10);
         pdf.setTextColor(60, 60, 60);
         
         // Split text into multiple lines to fit the page width
         const maxWidth = 170; // Maximum width for text in mm
-        const splitDescription = pdf.splitTextToSize(vulnerability.description, maxWidth);
+        const fullDescription = vulnerability.description;
+        const splitDescription = pdf.splitTextToSize(fullDescription, maxWidth);
+        
+        // Check if we need more space for the description
+        if (splitDescription.length > 2) {
+          checkAndAddPage(splitDescription.length * 5); // Account for all description lines
+        }
         
         splitDescription.forEach((line: string) => {
-          checkAndAddPage();
           pdf.text(line, 20, yPos);
           yPos += 5;
         });
         
+        // Add extra spacing after description
+        yPos += 2;
+        
         // Location
         if (vulnerability.location) {
-          checkAndAddPage();
+          checkAndAddPage(10);
           pdf.setFontSize(10);
           pdf.setTextColor(60, 60, 60);
-          pdf.text(`Location: ${vulnerability.location}`, 20, yPos);
-          yPos += 5;
+          const locationText = `Location: ${vulnerability.location}`;
+          const splitLocation = pdf.splitTextToSize(locationText, maxWidth);
+          
+          // Check if we need more space for location
+          if (splitLocation.length > 1) {
+            checkAndAddPage(splitLocation.length * 5);
+          }
+          
+          splitLocation.forEach((line: string) => {
+            pdf.text(line, 20, yPos);
+            yPos += 5;
+          });
+          
+          // Add small spacing
+          yPos += 2;
         }
         
         // Solution
         if (vulnerability.solution) {
-          checkAndAddPage();
+          checkAndAddPage(10);
           pdf.setFontSize(10);
           pdf.setTextColor(60, 60, 60);
           
-          const splitSolution = pdf.splitTextToSize(`Solution: ${vulnerability.solution}`, maxWidth);
+          const solutionText = `Solution: ${vulnerability.solution}`;
+          const splitSolution = pdf.splitTextToSize(solutionText, maxWidth);
+          
+          // Check if we need more space for solution
+          if (splitSolution.length > 1) {
+            checkAndAddPage(splitSolution.length * 5);
+          }
+          
           splitSolution.forEach((line: string) => {
-            checkAndAddPage();
             pdf.text(line, 20, yPos);
             yPos += 5;
           });
         }
         
-        yPos += 5; // Add some space between vulnerabilities
+        // Add more space between vulnerabilities
+        yPos += 8;
       });
       
       // Add secure code section if it exists
@@ -586,8 +631,12 @@ export default function AegisChatBot() {
         pdf.text(`AegisAI Security Report - Page ${i} of ${pageCount}`, 105, 290, { align: 'center' });
       }
       
-      // Save the PDF
-      pdf.save('aegisai-security-report.pdf');
+      // Generate timestamp for the filename
+      const now = new Date();
+      const timestamp = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}-${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+      
+      // Save the PDF with timestamp in filename
+      pdf.save(`aegisai-security-report-${timestamp}.pdf`);
     } catch (error) {
       console.error('Failed to generate PDF:', error);
     } finally {
@@ -997,8 +1046,8 @@ export default function AegisChatBot() {
     const parts = vector.split('/');
     const version = parts[0].split(':')[1];
     const metrics = parts.slice(1);
-    
-    return (
+
+  return (
       <div className="flex flex-wrap gap-1">
         <span className="px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 text-[10px] font-mono">
           v{version}
@@ -1227,13 +1276,13 @@ export default function AegisChatBot() {
                 <div key={i} className="leading-6 w-full text-center">{i + 1}</div>
               ))}
             </div>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
               placeholder="Paste your code here for security analysis..."
               className="min-h-[400px] w-full pl-14 pr-4 py-3 bg-gradient-to-b from-zinc-50/90 to-white dark:from-slate-900/90 dark:to-slate-950 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none font-mono text-sm leading-6 resize-none"
               spellCheck="false"
-            />
+        />
           </div>
         </div>
         <button
@@ -1260,7 +1309,7 @@ export default function AegisChatBot() {
             <h3 className="text-lg font-medium text-zinc-800 dark:text-zinc-100 flex items-center">
               <IconShield className="w-5 h-5 mr-2 text-indigo-500" />
               Vulnerabilities Detected
-            </h3>
+          </h3>
             <div className="flex items-center gap-2">
               <div className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium">
                 {getFilteredAndSortedVulnerabilities().length} of {vulnerabilities.length} {vulnerabilities.length === 1 ? 'issue' : 'issues'} shown
@@ -1748,8 +1797,8 @@ export default function AegisChatBot() {
                 </div>
                 <pre className="bg-gradient-to-b from-zinc-50/90 to-white dark:from-slate-900/90 dark:to-slate-950 p-4 overflow-x-auto text-sm text-left text-zinc-800 dark:text-zinc-100 font-mono">
                   <code>{secureCode}</code>
-                </pre>
-              </div>
+          </pre>
+        </div>
             ) : (
               <div className="max-h-[500px] overflow-hidden rounded-lg shadow-lg ring-1 ring-zinc-400/10 dark:ring-zinc-700/30 transition-all duration-300" ref={diffContainerRef}>
                 <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-2 bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-800 border-b border-zinc-300/70 dark:border-zinc-700/80">
